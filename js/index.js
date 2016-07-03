@@ -14,18 +14,7 @@ var index = {};
     // AudioContext object for interfacing with web audio API
     audioContext: undefined,
     // MIDIAccess object for interfacing with web MIDI API
-    midiAccess: undefined,
-    // Key for the MIDIInput object currently set to listen for input
-    midiInputListeningKey: undefined,
-    // Whether we are currently listening and saving MIDI input
-    isRecording: false,
-    // Time (ms) from page load to when recording started
-    startRecordTime: undefined,
-    // Map of note value to the index of a recorded note object in recordedNotes
-    // for which we have yet to see a "NoteOff" event
-    hangingNotes: {},
-    // Notes that have been recorded, ordered by start time
-    recordedNotes: []
+    midiAccess: undefined
   };
 
   /**
@@ -41,8 +30,8 @@ var index = {};
    * Cycle through available MIDIInput objects and make the input options
    * reflect these.
    */
-  function refreshMidiInputs() {
-    var midiInputs = document.getElementById("midi-inputs");
+  function onPressRefreshInputs() {
+    var midiInputs = document.getElementById("inputs");
     clearChildren(midiInputs);
     globals.midiAccess.inputs.forEach(function(port, key) {
       var inputOption = document.createElement("option");
@@ -56,8 +45,8 @@ var index = {};
    * Cycle through available MIDIOutput objects and make the output options
    * reflect these.
    */
-  function refreshMidiOutputs() {
-    var midiOutputs = document.getElementById("midi-outputs");
+  function onPressRefreshOutputs() {
+    var midiOutputs = document.getElementById("outputs");
     clearChildren(midiOutputs);
     globals.midiAccess.outputs.forEach(function(port, key) {
       var outputOption = document.createElement("option");
@@ -68,56 +57,18 @@ var index = {};
   }
 
   /**
-   * Handler for any incoming MIDIEvent. If it's NoteOn, save a partial note
-   * object, and if it's NoteOff, find the previously saved partial note object
-   * and complete it with an end time (note: only does these things if we're
-   * recording).
-   */
-  function onMidiInputMessage(midiEvent) {
-    var midiMsg = midiEvent.data;
-    if (globals.isRecording) {
-      if (midi.isNoteOnMessage(midiMsg)) {
-        var noteValue = midi.getNoteFromNoteMessage(midiMsg);
-        globals.hangingNotes[noteValue] = globals.recordedNotes.push({
-          "note": noteValue,
-          "start": midiEvent.timeStamp - globals.startRecordTime,
-          "velocity": midi.getVelocityFromNoteMessage(midiMsg)
-        }) - 1;
-      } else if (midi.isNoteOffMessage(midiMsg)) {
-        var noteValue = midi.getNoteFromNoteMessage(midiMsg);
-        var noteI = globals.hangingNotes[noteValue];
-        if (noteI !== undefined) {
-          var noteObj = globals.recordedNotes[noteI];
-          noteObj.end = midiEvent.timeStamp - globals.startRecordTime;
-          delete globals.hangingNotes[noteValue];
-        }
-      }
-    }
-  }
-
-  /**
    * Stop playback and start saving MIDI events from the selected input as note
    * objects.
    */
-  function record() {
+  function onPressRecord() {
     if (playback.isPlaying) {
       playback.stop();
     }
-    var midiInputSelect = document.getElementById("midi-inputs");
+    var midiInputSelect = document.getElementById("inputs");
     var midiInputKey = midiInputSelect.value;
-    if (globals.midiInputListeningKey !== midiInputKey) {
-      var midiInputs = globals.midiAccess.inputs;
-      if (globals.midiInputListeningKey) {
-        var oldInput = midiInputs.get(globals.midiInputListeningKey);
-        oldInput.removeEventListener("midimessage", onMidiInputMessage);
-      }
-      var newInput = midiInputs.get(midiInputKey);
-      newInput.addEventListener("midimessage", onMidiInputMessage);
-      globals.midiInputListeningKey = midiInputKey;
-    }
-    globals.startRecordTime = performance.now();
-    globals.recordedNotes = [];
-    globals.isRecording = true;
+    var recordMidiInput = globals.midiAccess.inputs.get(midiInputKey);
+    // 21u39812u39871829740982739084720938748!!!!!!!!!!!!!!
+    record.start(midiInputKey, globals.midiAccess); // #$%@$%^@$%^@$%^@#$%@#$%@#$%@#)$%
   }
 
   /**
@@ -125,14 +76,8 @@ var index = {};
    * notes left (i.e. notes that had NoteOn but no NoteOff), save them as though
    * they just got a NoteOff.
    */
-  function stopRecord() {
-    var end = globals.audioContext.currentTime * 1000;
-    globals.isRecording = false;
-    for (var noteValue in globals.hangingNotes) {
-      var noteObj = globals.recordedNotes[globals.hangingNotes[note]];
-      noteObj.end = end;
-      delete globals.hangingNotes[noteValue];
-    }
+  function onPressStopRecord() {
+    record.stop();
   }
 
   /**
@@ -140,7 +85,7 @@ var index = {};
    * selected.
    */
   function getSelectedMidiOut() {
-    var midiOutputSelect = document.getElementById("midi-outputs");
+    var midiOutputSelect = document.getElementById("outputs");
     var midiOutputKey = midiOutputSelect.value;
     return globals.midiAccess.outputs.get(midiOutputKey);
   }
@@ -148,7 +93,7 @@ var index = {};
   /**
    * Stop and reset playback.
    */
-  function stopPlay() {
+  function onPressStopPlay() {
     playback.stop();
   }
 
@@ -156,16 +101,16 @@ var index = {};
    * Stop recording and start sending MIDI events out for all of the recorded
    * notes.
    */
-  function play() {
-    if (globals.isRecording) {
-      stopRecord();
+  function onPressPlay() {
+    if (record.isRecording) {
+      onPressStopRecord();
     }
     var playbackMidiOut = getSelectedMidiOut();
     if (playbackMidiOut === undefined) {
       alert("No MIDI out selected.");
     } else {
       playback.play(
-        globals.recordedNotes, playbackMidiOut, globals.audioContext
+        record.notes, playbackMidiOut, globals.audioContext
       );
     }
   }
@@ -174,7 +119,7 @@ var index = {};
    * Send a MIDI panic signal out - AKA a NoteOff message to every single note.
    * This will silence any lingering notes waiting for a NoteOff.
    */
-  function panic() {
+  function onPressPanic() {
     midi.panic(getSelectedMidiOut());
   }
 
@@ -182,20 +127,20 @@ var index = {};
    * Set up the functions to get called when a user clicks on record, play, etc.
    */
   function initEventListeners() {
-    var refreshInputsButton = document.getElementById("refresh-midi-inputs");
-    refreshInputsButton.addEventListener("click", refreshMidiInputs);
-    var refreshOutputsButton = document.getElementById("refresh-midi-outputs");
-    refreshOutputsButton.addEventListener("click", refreshMidiOutputs);
+    var refreshInputsButton = document.getElementById("refresh-inputs");
+    refreshInputsButton.addEventListener("click", onPressRefreshInputs);
+    var refreshOutputsButton = document.getElementById("refresh-outputs");
+    refreshOutputsButton.addEventListener("click", onPressRefreshOutputs);
     var recordButton = document.getElementById("record");
-    recordButton.addEventListener("click", record);
+    recordButton.addEventListener("click", onPressRecord);
     var stopRecordButton = document.getElementById("stop-record");
-    stopRecordButton.addEventListener("click", stopRecord);
+    stopRecordButton.addEventListener("click", onPressStopRecord);
     var playButton = document.getElementById("play");
-    playButton.addEventListener("click", play);
+    playButton.addEventListener("click", onPressPlay);
     var stopPlayButton = document.getElementById("stop-play");
-    stopPlayButton.addEventListener("click", stopPlay);
+    stopPlayButton.addEventListener("click", onPressStopPlay);
     var panicButton = document.getElementById("panic");
-    panicButton.addEventListener("click", panic);
+    panicButton.addEventListener("click", onPressPanic);
   }
 
   /**
@@ -206,8 +151,8 @@ var index = {};
     globals.audioContext = new AudioContext();
     navigator.requestMIDIAccess().then(function(midiAccess) {
       globals.midiAccess = midiAccess;
-      refreshMidiInputs();
-      refreshMidiOutputs();
+      onPressRefreshInputs();
+      onPressRefreshOutputs();
     }, function() {
       alert("MIDI access denied.");
     });
