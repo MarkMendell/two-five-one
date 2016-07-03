@@ -1,3 +1,7 @@
+/**
+ * This module helps with various tasks relating to using the web MIDI
+ * interface.
+ */
 var midi = {};
 
 /**
