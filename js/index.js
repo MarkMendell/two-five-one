@@ -1,3 +1,6 @@
+/**
+ * This module is the main one run first by the website.
+ */
 var index = {};
 
 /**
@@ -8,13 +11,6 @@ var index = {};
 (function() {
   // Global variables used across functions
   var globals = {
-    //// Constants
-    // Time (ms) to wait between scheduling the next batch of notes for playback
-    PLAYBACK_INTERVAL: 25,
-    // For each batch of scheduling, the amount of time (ms) to schedule note
-    // playback for
-    PLAYBACK_LOOKAHEAD: 100,
-    //// Variables
     // AudioContext object for interfacing with web audio API
     audioContext: undefined,
     // MIDIAccess object for interfacing with web MIDI API
@@ -29,18 +25,7 @@ var index = {};
     // for which we have yet to see a "NoteOff" event
     hangingNotes: {},
     // Notes that have been recorded, ordered by start time
-    recordedNotes: [],
-    // Time (ms) from page load to when playback started
-    startPlaybackTime: undefined,
-    // Whether playback scheduling is going on currently
-    isPlaying: false,
-    // MIDIOutput object currently set for sending playback MIDI events to
-    playbackMidiOut: undefined,
-    // ID returned by setInterval for the function scheduling blocks of playback
-    playbackIntervalId: undefined,
-    // Index of the next note in recordedNotes that we need to schedule for
-    // playback
-    playbackIndex: 0
+    recordedNotes: []
   };
 
   /**
@@ -115,8 +100,8 @@ var index = {};
    * objects.
    */
   function record() {
-    if (globals.isPlaying) {
-      globals.stopPlay();
+    if (playback.isPlaying) {
+      playback.stop();
     }
     var midiInputSelect = document.getElementById("midi-inputs");
     var midiInputKey = midiInputSelect.value;
@@ -161,46 +146,10 @@ var index = {};
   }
 
   /**
-   * Stop scheduling notes for playback and reset the playback index.
+   * Stop and reset playback.
    */
   function stopPlay() {
-    if (globals.isPlaying) {
-      clearInterval(globals.playbackIntervalId);
-      globals.isPlaying = false;
-      globals.playbackIndex = 0;
-    }
-  }
-
-  /**
-   * Called every PLAYBACK_INTERVAL milliseconds during playback, this function
-   * sends scheduled MIDI events corresponding to all of the notes which start
-   * in the next PLAYBACK_LOOKAHEAD milliseconds.
-   */
-  function schedulePlaybackSection() {
-    var currentTime = globals.audioContext.currentTime * 1000;
-    var currentPlaybackTime = currentTime - globals.startPlaybackTime;
-    var sectionEndTime = currentPlaybackTime + globals.PLAYBACK_LOOKAHEAD;
-    var maxIndex = globals.recordedNotes.length;
-    while (true) {
-      if (globals.playbackIndex >= maxIndex) {
-        stopPlay();
-        break;
-      } else {
-        var noteObj = globals.recordedNotes[globals.playbackIndex];
-        if (noteObj.start <= sectionEndTime) {
-          midi.sendNote({
-            "midiOutput": globals.playbackMidiOut,
-            "note": noteObj.note,
-            "onTime": globals.startPlaybackTime + noteObj.start,
-            "offTime": globals.startPlaybackTime + noteObj.end,
-            "velocity": noteObj.velocity
-          });
-          globals.playbackIndex++;
-        } else {
-          break;
-        }
-      }
-    }
+    playback.stop();
   }
 
   /**
@@ -211,15 +160,13 @@ var index = {};
     if (globals.isRecording) {
       stopRecord();
     }
-    globals.playbackMidiOut = getSelectedMidiOut();
-    if (globals.playbackMidiOut === undefined) {
+    var playbackMidiOut = getSelectedMidiOut();
+    if (playbackMidiOut === undefined) {
       alert("No MIDI out selected.");
     } else {
-      globals.isPlaying = true;
-      globals.playbackIntervalId = setInterval(
-        schedulePlaybackSection, globals.PLAYBACK_INTERVAL
+      playback.play(
+        globals.recordedNotes, playbackMidiOut, globals.audioContext
       );
-      globals.startPlaybackTime = globals.audioContext.currentTime * 1000;
     }
   }
 
