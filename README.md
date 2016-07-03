@@ -1,7 +1,7 @@
 # two-five-one
 http://twofive.one
 
-Record and play back MIDI.
+Record MIDI, then see it and play it back.
 
 ## Run Locally
 1. Download the code.  

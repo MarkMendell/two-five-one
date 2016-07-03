@@ -76,6 +76,10 @@ var index = {};
    */
   function onPressStopRecord() {
     record.stop();
+    if (record.notes.length > 0) {
+      var displayCanvas = document.getElementById("record-display");
+      notedisplay.showNotes(record.notes, displayCanvas);
+    }
   }
 
   /**
