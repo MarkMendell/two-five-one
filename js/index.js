@@ -11,8 +11,6 @@ var index = {};
 (function() {
   // Global variables used across functions
   var globals = {
-    // AudioContext object for interfacing with web audio API
-    audioContext: undefined,
     // MIDIAccess object for interfacing with web MIDI API
     midiAccess: undefined
   };
@@ -109,9 +107,7 @@ var index = {};
     if (playbackMidiOut === undefined) {
       alert("No MIDI out selected.");
     } else {
-      playback.play(
-        record.notes, playbackMidiOut, globals.audioContext
-      );
+      playback.play(record.notes, playbackMidiOut);
     }
   }
 
@@ -148,7 +144,6 @@ var index = {};
    */
   index.init = function() {
     initEventListeners();
-    globals.audioContext = new AudioContext();
     navigator.requestMIDIAccess().then(function(midiAccess) {
       globals.midiAccess = midiAccess;
       onPressRefreshInputs();

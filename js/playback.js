@@ -17,8 +17,6 @@ var playback = {};
     //// Variables
     // MIDIOutput object for sending playback MIDI events to
     midiOut: undefined,
-    // AudioContext object used for timing
-    audioContext: undefined,
     // ID returned by setInterval for the function scheduling blocks of playback
     playbackIntervalId: undefined,
     // Time (ms) from page load to when playback started
@@ -48,7 +46,7 @@ var playback = {};
    * in the next PLAYBACK_LOOKAHEAD milliseconds.
    */
   function schedulePlaybackSection() {
-    var currentTime = globals.audioContext.currentTime * 1000;
+    var currentTime = performance.now();
     var currentPlaybackTime = currentTime - globals.startPlaybackTime;
     var sectionEndTime = currentPlaybackTime + globals.PLAYBACK_LOOKAHEAD;
     var maxIndex = globals.notes.length;
@@ -75,9 +73,9 @@ var playback = {};
   }
 
   /**
-   * Given a list of notes, a MIDIOutput object, and an AudioContext, stop
-   * whatever is currently playing and start playing back those notes through
-   * the MIDIOutput device using the AudioContext object for timing.
+   * Given a list of notes and a MIDIOutput object, stop whatever is currently
+   * playing and start playing back the provided notes through the MIDIOutput
+   * device.
    *
    * Recorded notes are each an object with attributes:
    * - note: integer MIDI note value (middle C is 60)
@@ -89,17 +87,16 @@ var playback = {};
    * Playback occurs by scheduling PLAYBACK_LOOKAHEAD ms of notes every
    * PLAYBACK_LOOKAHEAD ms.
    */
-  playback.play = function(notes, midiOut, audioContext) {
+  playback.play = function(notes, midiOut) {
     if (playback.isPlaying) {
       playback.stop();
     }
     playback.isPlaying = true;
     globals.midiOut = midiOut;
-    globals.audioContext = audioContext;
     globals.notes = notes;
     globals.playbackIntervalId = setInterval(
       schedulePlaybackSection, globals.PLAYBACK_INTERVAL
     );
-    globals.startPlaybackTime = globals.audioContext.currentTime * 1000;
+    globals.startPlaybackTime = performance.now();
   };
 })()
