@@ -20,6 +20,8 @@ var notedisplay = {};
     NOTE_GAP: 1,
     // How many pixels correspond to a millisecond of time
     PX_PER_MS: 0.1,
+    // Color of normal, unselected note
+    NOTE_COLOR: "black",
     //// Variables
     // Canvas used for displaying the notes
     noteCanvas: undefined
@@ -34,6 +36,7 @@ var notedisplay = {};
     var y = (127 - note.note) * (globals.NOTE_HEIGHT + globals.NOTE_GAP);
     var w = Math.ceil((note.end - note.start) * globals.PX_PER_MS);
     var h = globals.NOTE_HEIGHT;
+    ctx.fillStyle = globals.NOTE_COLOR;
     ctx.fillRect(x, y, w, h);
   }
 
