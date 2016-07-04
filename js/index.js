@@ -77,8 +77,7 @@ var index = {};
   function onPressStopRecord() {
     record.stop();
     if (record.notes.length > 0) {
-      var displayCanvas = document.getElementById("record-display");
-      notedisplay.showNotes(record.notes, displayCanvas);
+      notedisplay.showNotes(record.notes);
     }
   }
 
@@ -148,6 +147,7 @@ var index = {};
    */
   index.init = function() {
     initEventListeners();
+    notedisplay.init(document.getElementById("record-display"));
     navigator.requestMIDIAccess().then(function(midiAccess) {
       globals.midiAccess = midiAccess;
       onPressRefreshInputs();
