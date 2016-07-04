@@ -64,9 +64,8 @@ var index = {};
     }
     var midiInputSelect = document.getElementById("inputs");
     var midiInputKey = midiInputSelect.value;
-    var recordMidiInput = globals.midiAccess.inputs.get(midiInputKey);
-    // 21u39812u39871829740982739084720938748!!!!!!!!!!!!!!
-    record.start(midiInputKey, globals.midiAccess); // #$%@$%^@$%^@$%^@#$%@#$%@#$%@#)$%
+    var midiInput = globals.midiAccess.inputs.get(midiInputKey);
+    record.start(midiInput);
   }
 
   /**

@@ -16,7 +16,9 @@ var record = {};
     startTime: undefined,
     // Map of note value to the index of a recorded note object in recordedNotes
     // for which we have yet to see a "NoteOff" event
-    hangingNotes: {}
+    hangingNotes: {},
+    // MIDIInput with an event listener currently attached for recording
+    midiInput: undefined
   };
 
   // Notes that have been recorded, ordered by start time; may have partially
@@ -58,18 +60,15 @@ var record = {};
    * Given a MIDIInput object, clear any previous recording and start listening
    * to its MIDI events and saving them in order as complete note objects.
    */
-  record.start = function(midiInput, midiAccess) {
-    var midiInputKey = midiInput;
-    globals.midiAccess = midiAccess;
-    if (globals.midiInputListeningKey !== midiInputKey) {
-      var midiInputs = globals.midiAccess.inputs;
-      if (globals.midiInputListeningKey) {
-        var oldInput = midiInputs.get(globals.midiInputListeningKey);
-        oldInput.removeEventListener("midimessage", onMidiInputMessage);
+  record.start = function(midiInput) {
+    if (midiInput !== globals.midiInput) {
+      if (globals.midiInput) {
+        globals.midiInput.removeEventListener(
+          "midimessage", onMidiInputMessage
+        );
       }
-      var newInput = midiInputs.get(midiInputKey);
-      newInput.addEventListener("midimessage", onMidiInputMessage);
-      globals.midiInputListeningKey = midiInputKey;
+      midiInput.addEventListener("midimessage", onMidiInputMessage);
+      globals.midiInput = midiInput;
     }
     globals.startTime = performance.now();
     record.notes = [];
