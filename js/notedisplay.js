@@ -28,6 +28,18 @@ var notedisplay = {};
   };
 
   /**
+   * Initialize the canvases used for the display as children of the provided
+   * element. This function must be called first before you can use other
+   * display functions.
+   */
+  notedisplay.init = function(container) {
+    globals.noteCanvas = document.createElement("canvas");
+    globals.noteCanvas.width = 0;
+    globals.noteCanvas.height = 0;
+    container.appendChild(globals.noteCanvas);
+  };
+
+  /**
    * Given a note object and a CanvasRenderingContext2D, draw the note on the
    * canvas 2D context.
    */
@@ -56,17 +68,5 @@ var notedisplay = {};
     globals.noteCanvas.height = (globals.NOTE_HEIGHT + globals.NOTE_GAP) * 128;
     var ctx = globals.noteCanvas.getContext("2d");
     notes.forEach(function(note) { drawNote(note, ctx); });
-  };
-
-  /**
-   * Initialize the canvases used for the display as children of the provided
-   * element. This function must be called first before you can use other
-   * display functions.
-   */
-  notedisplay.init = function(container) {
-    globals.noteCanvas = document.createElement("canvas");
-    globals.noteCanvas.width = 0;
-    globals.noteCanvas.height = 0;
-    container.appendChild(globals.noteCanvas);
   };
 })();
