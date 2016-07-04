@@ -24,7 +24,9 @@ var notedisplay = {};
     NOTE_COLOR: "black",
     //// Variables
     // Canvas used for displaying the notes
-    noteCanvas: undefined
+    noteCanvas: undefined,
+    // Internal notes list used as model (never modified)
+    notes: []
   };
 
   /**
@@ -53,6 +55,38 @@ var notedisplay = {};
   }
 
   /**
+   * Given a list of notes, make a copy of it for our own internal use and store
+   * it globally, never to be modified, just updated using this function.
+   *
+   * Ideally, we wouldn't store these notes globally but just implicitly in the
+   * event listeners since they're only used there, but since we would then have
+   * to keep around the event listeners to be able to replace them, we might as
+   * well just keep the notes model around.
+   */
+  function setNotes(notes) {
+    globals.notes = [];
+    for (var i=0; i<notes.length; i++ ) {
+      var noteCopy = JSON.parse(JSON.stringify(notes[i]));
+      globals.notes.push(noteCopy);
+    }
+  }
+
+  /**
+   * Using the internal list of notes as a model, clear the current display and
+   * draw a new one.
+   */
+  function refreshDisplay() {
+    var maxTime = globals.notes.reduce(function(prevMax, note) {
+      return Math.max(prevMax, note.end);
+    }, 0);
+    // Setting the width/height clears the canvas as well
+    globals.noteCanvas.width = Math.ceil(maxTime * globals.PX_PER_MS);
+    globals.noteCanvas.height = (globals.NOTE_HEIGHT + globals.NOTE_GAP) * 128;
+    var ctx = globals.noteCanvas.getContext("2d");
+    globals.notes.forEach(function(note) { drawNote(note, ctx); });
+  }
+
+  /**
    * Given a list of notes, clear whatever notes were drawn before and display
    * the provided notes. A note is an object with the following attributes:
    * - start: double representing time (ms) the note begins
@@ -60,13 +94,7 @@ var notedisplay = {};
    * - note: integer MIDI note value (60 is middle C)
    */
   notedisplay.showNotes = function(notes) {
-    var maxTime = notes.reduce(function(prevMax, note) {
-      return Math.max(prevMax, note.end);
-    }, 0);
-    // Setting the width/height clears the canvas as well
-    globals.noteCanvas.width = Math.ceil(maxTime * globals.PX_PER_MS);
-    globals.noteCanvas.height = (globals.NOTE_HEIGHT + globals.NOTE_GAP) * 128;
-    var ctx = globals.noteCanvas.getContext("2d");
-    notes.forEach(function(note) { drawNote(note, ctx); });
+    setNotes(notes);
+    refreshDisplay();
   };
 })();
