@@ -230,7 +230,12 @@ var notedisplay = {};
     } else {
       drawNoteWithColor(note, globals.NOTE_COLOR, ctx);
     }
-    if (globals.highlightedNoteEdge &&
+    if (globals.mouseDownNoteEdge &&
+        (note === globals.mouseDownNoteEdge.note)) {
+      drawNoteEdgeWithColor(
+        globals.mouseDownNoteEdge, globals.NOTE_MOUSEDOWN_COLOR, ctx
+      );
+    } else if (globals.highlightedNoteEdge &&
         (note === globals.highlightedNoteEdge.note)) {
       drawNoteEdgeWithColor(
         globals.highlightedNoteEdge, globals.NOTE_HIGHLIGHTED_COLOR, ctx
@@ -265,6 +270,11 @@ var notedisplay = {};
       globals.mouseDownNote = undefined;
       drawNote(note, globals.noteCanvas.getContext("2d"));
     }
+    if (globals.mouseDownNoteEdge) {
+      var note = globals.mouseDownNoteEdge.note;
+      globals.mouseDownNoteEdge = undefined;
+      drawNote(note, globals.noteCanvas.getContext("2d"));
+    }
   }
 
   /**
@@ -282,7 +292,12 @@ var notedisplay = {};
       globals.highlightedNote = hoveredNote;
       drawNote(hoveredNote, globals.noteCanvas.getContext("2d"));
     }
-    if (hoveredNote !== globals.mouseDownNote) {
+    // This condition doesn't do exactly what we want (it doesn't clear the
+    // mouse-down edge after moving off that edge), but that functionality will
+    // change once edges can be dragged and the logic was too complex to add in
+    // temporarily
+    if ((hoveredNote !== globals.mouseDownNote) &&
+        (!globals.mouseDownNoteEdge)) {
       clearMouseDown();
     }
   }
@@ -307,9 +322,15 @@ var notedisplay = {};
     // listener which will mark the canvas as out of focus
     globals.isFocused = true;
     mouseEvent.stopPropagation();
-    globals.mouseDownNote = getNoteFromMouseEvent(mouseEvent);
-    if (globals.mouseDownNote) {
-      drawNote(globals.mouseDownNote, globals.noteCanvas.getContext("2d"));
+    var mouseDownNoteEdge = getNoteEdgeFromMouseEvent(mouseEvent);
+    var mouseDownNote = getNoteFromMouseEvent(mouseEvent);
+    clearMouseDown();
+    if (mouseDownNoteEdge) {
+      globals.mouseDownNoteEdge = mouseDownNoteEdge;
+      drawNote(mouseDownNoteEdge.note, globals.noteCanvas.getContext("2d"));
+    } else if (mouseDownNote) {
+      globals.mouseDownNote = mouseDownNote;
+      drawNote(mouseDownNote, globals.noteCanvas.getContext("2d"));
     }
   }
 
@@ -338,9 +359,11 @@ var notedisplay = {};
    */
   function onMouseUpNoteCanvas(mouseEvent) {
     var mouseUpNote = getNoteFromMouseEvent(mouseEvent);
-    if (globals.mouseDownNote && (globals.mouseDownNote === mouseUpNote)) {
+    if ((globals.mouseDownNote && (globals.mouseDownNote === mouseUpNote)) ||
+        (globals.mouseDownNoteEdge &&
+          (globals.mouseDownNoteEdge.note == mouseUpNote))) {
       clearSelection();
-      globals.selectedNote = globals.mouseDownNote;
+      globals.selectedNote = mouseUpNote;
       drawNote(globals.selectedNote, globals.noteCanvas.getContext("2d"));
     }
     clearMouseDown();
