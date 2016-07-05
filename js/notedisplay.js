@@ -28,6 +28,8 @@ var notedisplay = {};
     NOTE_MOUSEDOWN_COLOR: "darkgrey",
     // Color of note that is currently selected
     NOTE_SELECTED_COLOR: "silver",
+    // Keys that can be pressed to delete a selection
+    DELETE_KEYS: ["Backspace", "Delete", "x"],
     //// Variables
     // Canvas used for displaying the notes
     noteCanvas: undefined,
@@ -38,7 +40,12 @@ var notedisplay = {};
     // Note that the currently held-down mouse started on when it clicked
     mouseDownNote: undefined,
     // Note currently selected
-    selectedNote: undefined
+    selectedNote: undefined,
+    // Keeps track of whether the canvas can be treated as being 'in focus'
+    // (since a canvas element can never be actually in focus)
+    isFocused: false,
+    // Callback for when a note is 'deleted' by the user
+    deleteCallback: undefined
   };
 
   /**
@@ -179,10 +186,24 @@ var notedisplay = {};
   function onMouseDownNoteCanvas(mouseEvent) {
     // stops cursor from becoming text cursor on drag
     mouseEvent.preventDefault();
+    // since the canvas can't be focused on normally, we keep track of clicks in
+    // the canvas, and stop from bubbling out to the document mousedown
+    // listener which will mark the canvas as out of focus
+    globals.isFocused = true;
+    mouseEvent.stopPropagation();
     globals.mouseDownNote = getNoteFromMouseEvent(mouseEvent);
     if (globals.mouseDownNote) {
       drawNote(globals.mouseDownNote, globals.noteCanvas.getContext("2d"));
     }
+  }
+
+  /**
+   * Called when the mouse is pressed down outside of the canvas (the listener
+   * is bound to anywhere in the document, but we stop propagation of the event
+   * if it happened in the noteCanvas).
+   */
+  function onMouseDownDocument(mouseEvent) {
+    globals.isFocused = false;
   }
 
   /**
@@ -210,19 +231,50 @@ var notedisplay = {};
   }
 
   /**
-   * Initialize the canvases used for the display as children of the provided
-   * element. This function must be called first before you can use other
-   * display functions.
+   * Called when a key is pressed down in the document.
+   *
+   * Ideally, this would be a key down event handler for keys pressed when the
+   * canvas is in focus, but a canvas can never be in focus. To handle this, we
+   * keep track of whether the canvas would technically currently be in focus
+   * (globals.isFocused), then listen for all key presses in the document, and
+   * ignore them if the canvas isn't 'in focus'.
    */
-  notedisplay.init = function(container) {
+  function onKeyDownDocument(keyboardEvent) {
+    // Ignore key presses if the canvas isn't 'in focus'
+    if (!globals.isFocused) {
+      return;
+    }
+    // Prevent browsers from going back a page when backspace is pressed
+    if (keyboardEvent.key === "Backspace") {
+      keyboardEvent.preventDefault();
+    }
+    if (globals.DELETE_KEYS.includes(keyboardEvent.key)) {
+      if (globals.selectedNote && globals.deleteCallback) {
+        globals.deleteCallback(globals.selectedNote);
+      }
+    }
+  }
+
+  /**
+   * Initialize the canvases used for the display as children of the provided
+   * element. The deleteCallback will be called with the argument of a note if
+   * the user ever tries to 'delete' said note.
+   *
+   * This function must be called first before you can use other display
+   * functions.
+   */
+  notedisplay.init = function(container, deleteCallback) {
     globals.noteCanvas = document.createElement("canvas");
     globals.noteCanvas.width = 0;
     globals.noteCanvas.height = 0;
     globals.noteCanvas.addEventListener("mousemove", onMouseMoveNoteCanvas);
     globals.noteCanvas.addEventListener("mouseleave", onMouseLeaveNoteCanvas);
     globals.noteCanvas.addEventListener("mousedown", onMouseDownNoteCanvas);
+    document.addEventListener("mousedown", onMouseDownDocument);
     globals.noteCanvas.addEventListener("mouseup", onMouseUpNoteCanvas);
+    document.addEventListener("keydown", onKeyDownDocument);
     container.appendChild(globals.noteCanvas);
+    globals.deleteCallback = deleteCallback;
   };
 
   /**
@@ -235,11 +287,7 @@ var notedisplay = {};
    * well just keep the notes model around.
    */
   function setNotes(notes) {
-    globals.notes = [];
-    for (var i=0; i<notes.length; i++ ) {
-      var noteCopy = JSON.parse(JSON.stringify(notes[i]));
-      globals.notes.push(noteCopy);
-    }
+    globals.notes = util.noteListCopy(notes);
   }
 
   /**
