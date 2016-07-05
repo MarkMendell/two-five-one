@@ -24,13 +24,17 @@ var notedisplay = {};
     NOTE_COLOR: "black",
     // Color of highlighted note, like when hovered over
     NOTE_HIGHLIGHTED_COLOR: "lightgrey",
+    // Color of note that that has been clicked and held down on
+    NOTE_MOUSEDOWN_COLOR: "darkgrey",
     //// Variables
     // Canvas used for displaying the notes
     noteCanvas: undefined,
     // Internal notes list used as model (never modified)
     notes: [],
     // Note currently hovered over
-    highlightedNote: undefined
+    highlightedNote: undefined,
+    // Note that the currently held-down mouse started on when it clicked
+    mouseDownNote: undefined
   };
 
   /**
@@ -65,22 +69,38 @@ var notedisplay = {};
   }
 
   /**
-   * Draw the provided note in a highlighted style (like if it's hovered over)
-   * on the provided CanvasRenderingContext2D.
+   * Loop through the notes on the noteCanvas and see if the provided x and y
+   * coordinates are inside one of them. If they are, return that note;
+   * otherwise, return undefined.
    */
-  function drawHighlightedNote(note, ctx) {
-    var [x0, y0, x1, y1] = getNoteCoords(note);
-    ctx.fillStyle = globals.NOTE_HIGHLIGHTED_COLOR;
-    ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+  function getNoteInCoords(x, y) {
+    for (var i=0; i<globals.notes.length; i++) {
+      var note = globals.notes[i];
+      if (isInNote(x, y, note)) {
+        return note;
+      }
+    }
+    return undefined;
   }
 
   /**
-   * Given a note object and a CanvasRenderingContext2D, draw the note on the
-   * canvas 2D context.
+   * Return the note corresponding to the location of the mouse event, if there
+   * is one. Otherwise, return undefined.
    */
-  function drawNote(note, ctx) {
+  function getNoteFromMouseEvent(mouseEvent) {
+    var [x, y] = getCanvasCoordinatesFromMouseEvent(
+      mouseEvent, globals.noteCanvas
+    );
+    return getNoteInCoords(x, y);
+  }
+
+  /**
+   * Given a note object, a color, and a CanvasRenderingContext2D, draw the note
+   * on the canvas 2D context with the given color.
+   */
+  function drawNote(note, color, ctx) {
     var [x0, y0, x1, y1] = getNoteCoords(note);
-    ctx.fillStyle = globals.NOTE_COLOR;
+    ctx.fillStyle = color;
     ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
   }
 
@@ -90,8 +110,24 @@ var notedisplay = {};
    */
   function clearHighlight() {
     if (globals.highlightedNote) {
-      drawNote(globals.highlightedNote, globals.noteCanvas.getContext("2d"));
+      var ctx = globals.noteCanvas.getContext("2d");
+      drawNote(globals.highlightedNote, globals.NOTE_COLOR, ctx);
+      if (globals.highlightedNote === globals.mouseDownNote) {
+        drawNote(globals.mouseDownNote, globals.NOTE_MOUSEDOWN_COLOR, ctx);
+      }
       globals.highlightedNote = undefined;
+    }
+  }
+
+  /**
+   * If a note is set as having the mouse held down over it, remove it from
+   * that designation and redraw it as normal.
+   */
+  function clearMouseDown() {
+    if (globals.mouseDownNote) {
+      var ctx = globals.noteCanvas.getContext("2d");
+      drawNote(globals.mouseDownNote, globals.NOTE_COLOR, ctx);
+      globals.mouseDownNote = undefined;
     }
   }
 
@@ -99,19 +135,16 @@ var notedisplay = {};
    * Called when the cursor has hovered over the specified x and y coordinates
    * of the noteCanvas.
    */
-  function onMouseOverNoteCanvas(mouseEvent) {
-    var [x, y] = getCanvasCoordinatesFromMouseEvent(
-      mouseEvent, globals.noteCanvas
-    );
+  function onMouseMoveNoteCanvas(mouseEvent) {
+    var hoveredNote = getNoteFromMouseEvent(mouseEvent);
     clearHighlight();
-    var ctx = globals.noteCanvas.getContext("2d");
-    for (var i=0; i<globals.notes.length; i++) {
-      var note = globals.notes[i];
-      if (isInNote(x, y, note)) {
-        globals.highlightedNote = note;
-        drawHighlightedNote(note, ctx);
-        break;
-      }
+    if (hoveredNote && (hoveredNote !== globals.mouseDownNote)) {
+      clearMouseDown();
+      globals.highlightedNote = hoveredNote;
+      var ctx = globals.noteCanvas.getContext("2d");
+      drawNote(hoveredNote, globals.NOTE_HIGHLIGHTED_COLOR, ctx);
+    } else if (!hoveredNote && globals.mouseDownNote) {
+      clearMouseDown();
     }
   }
 
@@ -120,6 +153,28 @@ var notedisplay = {};
    */
   function onMouseLeaveNoteCanvas(mouseEvent) {
     clearHighlight();
+    clearMouseDown();
+  }
+
+  /**
+   * Called when the mouse is pressed down (but not a full click) in the
+   * noteCanvas.
+   */
+  function onMouseDownNoteCanvas(mouseEvent) {
+    // stops cursor from becoming text cursor on drag
+    mouseEvent.preventDefault();
+    globals.mouseDownNote = getNoteFromMouseEvent(mouseEvent);
+    if (globals.mouseDownNote) {
+      var ctx = globals.noteCanvas.getContext("2d");
+      drawNote(globals.mouseDownNote, globals.NOTE_MOUSEDOWN_COLOR, ctx);
+    }
+  }
+
+  /**
+   * Called when the pressed-down mouse is lifted inside of the noteCanvas.
+   */
+  function onMouseUpNoteCanvas(mouseEvent) {
+    clearMouseDown();
   }
 
   /**
@@ -131,8 +186,10 @@ var notedisplay = {};
     globals.noteCanvas = document.createElement("canvas");
     globals.noteCanvas.width = 0;
     globals.noteCanvas.height = 0;
-    globals.noteCanvas.addEventListener("mousemove", onMouseOverNoteCanvas);
+    globals.noteCanvas.addEventListener("mousemove", onMouseMoveNoteCanvas);
     globals.noteCanvas.addEventListener("mouseleave", onMouseLeaveNoteCanvas);
+    globals.noteCanvas.addEventListener("mousedown", onMouseDownNoteCanvas);
+    globals.noteCanvas.addEventListener("mouseup", onMouseUpNoteCanvas);
     container.appendChild(globals.noteCanvas);
   };
 
@@ -165,7 +222,9 @@ var notedisplay = {};
     globals.noteCanvas.width = Math.ceil(maxTime * globals.PX_PER_MS);
     globals.noteCanvas.height = (globals.NOTE_HEIGHT + globals.NOTE_GAP) * 128;
     var ctx = globals.noteCanvas.getContext("2d");
-    globals.notes.forEach(function(note) { drawNote(note, ctx); });
+    globals.notes.forEach(function(note) {
+      drawNote(note, globals.NOTE_COLOR, ctx);
+    });
   }
 
   /**
