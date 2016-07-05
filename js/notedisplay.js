@@ -20,6 +20,16 @@ var notedisplay = {};
     NOTE_GAP: 1,
     // How many pixels correspond to a millisecond of time
     PX_PER_MS: 0.1,
+    // Number of pixels on the outward side of a note's edge that the mouse can
+    // still be considered over that edge
+    EDGE_PAD_OUT: 1,
+    // Number of pixels on the inward side of a note's edge that the mouse can
+    // still be considered over that edge
+    EDGE_PAD_IN: 5,
+    // Number of pixels to highlight when an edge is selected, hovered, etc.
+    // (Note that while EDGE_PAD_* modifies the hoverable region by the mouse,
+    // EDGE_WIDTH is purely cosmetic.)
+    EDGE_WIDTH: 7,
     // Color of normal, unselected note
     NOTE_COLOR: "black",
     // Color of highlighted note, like when hovered over
@@ -71,6 +81,77 @@ var notedisplay = {};
   }
 
   /**
+   * Return true if the provided coordinates could be considered hovering over
+   * the edge of the given note, and false otherwise.
+   *
+   * Note that if by the dimensions of the EDGE_PAD_* the coordinates could be
+   * in either edge, return true only if this edge is the closer one.
+   */
+  function isInNoteEdge(x, y, note, edge) {
+    var [x0, y0, x1, y1] = getNoteCoords(note);
+    if ((y < y0) || (y > y1)) {
+      return false;
+    }
+    var [leftEdgeCoord, rightEdgeCoord] = [x0, x1];
+    var leftLeftBound = leftEdgeCoord - globals.EDGE_PAD_OUT;
+    var rightLeftBound = Math.max(
+      leftEdgeCoord, rightEdgeCoord - globals.EDGE_PAD_IN
+    );
+    var leftRightBound = Math.min(
+      rightEdgeCoord, leftEdgeCoord + globals.EDGE_PAD_IN
+    );
+    var rightRightBound = rightEdgeCoord + globals.EDGE_PAD_OUT;
+    var isInLeftEdge = ((x >= leftLeftBound) && (x <= leftRightBound));
+    var isInRightEdge = ((x >= rightLeftBound) && (x <= rightRightBound));
+    if (isInLeftEdge && isInRightEdge) {
+      var leftDelta = Math.abs(x - leftEdgeCoord);
+      var rightDelta = Math.abs(x - rightEdgeCoord);
+      if (leftDelta <= rightDelta) {
+        return edge === "left";
+      } else {
+        return edge === "right";
+      }
+    } else if (isInLeftEdge) {
+      return edge === "left";
+    } else if (isInRightEdge) {
+      return edge === "right";
+    } else {
+      return false;
+    }
+  }
+
+  /**
+   * Loop through the notes on the noteCanvas and see if the provided x and y
+   * coordinates could be considered to be hovering over one of their edges. If
+   * they are, return an object with attributes "note" representing the note
+   * matched and "edge", either "left" or "right"; otherwise, return undefined.
+   */
+  function getNoteEdgeInCoords(x, y) {
+    for (var i=0; i<globals.notes.length; i++) {
+      var note = globals.notes[i];
+      if (isInNoteEdge(x, y, note, "left")) {
+        return {note: note, edge: "left"};
+      } else if (isInNoteEdge(x, y, note, "right")) {
+        return {note: note, edge: "right"};
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * If the edge of a note could be considered hovered over by the mouse
+   * coordinates of the provided MouseEvent, return an object with attributes
+   * "note" representing the note matched and "edge", either "left" or "right".
+   * Otherwise, return undefined.
+   */
+  function getNoteEdgeFromMouseEvent(mouseEvent) {
+    var [x, y] = getCanvasCoordinatesFromMouseEvent(
+        mouseEvent, globals.noteCanvas
+    );
+    return getNoteEdgeInCoords(x, y);
+  }
+
+  /**
    * Returns whether or not the provided x and y coordinates are within the
    * drawn area of the note.
    */
@@ -116,6 +197,26 @@ var notedisplay = {};
   }
 
   /**
+   * Given an object with a "note" attribute and an "edge" (either left or
+   * right), a color, and a CanvasRenderingContext2D, draw the edge of the note
+   * given with the provided color on the canvas 2D context.
+   */
+  function drawNoteEdgeWithColor(noteEdge, color, ctx) {
+    var [x0, y0, x1, y1] = getNoteCoords(noteEdge.note);
+    var noteLength = x1 - x0;
+    var edgeWidth = Math.max(1, Math.min(globals.EDGE_WIDTH, noteLength - 1));
+    var x = (noteEdge.edge === "left")
+      ? (x0 + edgeWidth/2)
+      : (x1 - edgeWidth/2);
+    ctx.beginPath();
+    ctx.lineWidth = edgeWidth;
+    ctx.moveTo(x, y0);
+    ctx.lineTo(x, y1);
+    ctx.strokeStyle = color;
+    ctx.stroke();
+  }
+
+  /**
    * Given a note and CanvasRenderingContext2D, check if the note is any of the
    * special notes (highlighted, selected, mousedown) and draw it accordingly.
    */
@@ -129,6 +230,12 @@ var notedisplay = {};
     } else {
       drawNoteWithColor(note, globals.NOTE_COLOR, ctx);
     }
+    if (globals.highlightedNoteEdge &&
+        (note === globals.highlightedNoteEdge.note)) {
+      drawNoteEdgeWithColor(
+        globals.highlightedNoteEdge, globals.NOTE_HIGHLIGHTED_COLOR, ctx
+      );
+    }
   }
 
   /**
@@ -139,6 +246,11 @@ var notedisplay = {};
     if (globals.highlightedNote) {
       var note = globals.highlightedNote;
       globals.highlightedNote = undefined;
+      drawNote(note, globals.noteCanvas.getContext("2d"));
+    }
+    if (globals.highlightedNoteEdge) {
+      var note = globals.highlightedNoteEdge.note;
+      globals.highlightedNoteEdge = undefined;
       drawNote(note, globals.noteCanvas.getContext("2d"));
     }
   }
@@ -160,9 +272,13 @@ var notedisplay = {};
    * of the noteCanvas.
    */
   function onMouseMoveNoteCanvas(mouseEvent) {
+    var hoveredNoteEdge = getNoteEdgeFromMouseEvent(mouseEvent);
     var hoveredNote = getNoteFromMouseEvent(mouseEvent);
     clearHighlight();
-    if (hoveredNote) {
+    if (hoveredNoteEdge) {
+      globals.highlightedNoteEdge = hoveredNoteEdge;
+      drawNote(hoveredNoteEdge.note, globals.noteCanvas.getContext("2d"));
+    } else if (hoveredNote) {
       globals.highlightedNote = hoveredNote;
       drawNote(hoveredNote, globals.noteCanvas.getContext("2d"));
     }
