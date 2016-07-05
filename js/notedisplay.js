@@ -43,6 +43,8 @@ var notedisplay = {};
     //// Variables
     // Canvas used for displaying the notes
     noteCanvas: undefined,
+    // Canvas layer above the noteCanvas used for notes being dragged
+    dragCanvas: undefined,
     // Internal notes list used as model (never modified)
     notes: [],
     // Note currently hovered over
@@ -413,6 +415,10 @@ var notedisplay = {};
     globals.noteCanvas.addEventListener("mouseup", onMouseUpNoteCanvas);
     document.addEventListener("keydown", onKeyDownDocument);
     container.appendChild(globals.noteCanvas);
+    globals.dragCanvas = document.createElement("canvas");
+    globals.dragCanvas.width = 0;
+    globals.dragCanvas.height = 0;
+    container.appendChild(globals.dragCanvas);
     globals.deleteCallback = deleteCallback;
   };
 
@@ -443,6 +449,8 @@ var notedisplay = {};
     // Setting the width/height clears the canvas as well
     globals.noteCanvas.width = Math.ceil(maxTime * globals.PX_PER_MS);
     globals.noteCanvas.height = (globals.NOTE_HEIGHT + globals.NOTE_GAP) * 128;
+    globals.dragCanvas.width = globals.noteCanvas.width;
+    globals.dragCanvas.height = globals.noteCanvas.height;
     var ctx = globals.noteCanvas.getContext("2d");
     globals.notes.forEach(function(note) { drawNote(note, ctx); });
   }
