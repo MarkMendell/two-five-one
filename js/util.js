@@ -17,4 +17,13 @@ var util = {};
     }
     return copyList;
   };
+
+  /**
+   * Given a list of notes, return the end time of the last note to end.
+   */
+  util.getMaxTime = function(notes) {
+    return notes.reduce(function(prevMax, note) {
+      return Math.max(prevMax, note.end);
+    }, 0);
+  };
 })()

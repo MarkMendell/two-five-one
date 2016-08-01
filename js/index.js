@@ -112,7 +112,10 @@ var index = {};
     if (playbackMidiOut === undefined) {
       alert("No MIDI out selected.");
     } else {
-      playback.play(globals.notes, playbackMidiOut);
+      notedisplay.startContinuousTimeUpdate(playback.getTime);
+      playback.play(
+        globals.notes, playbackMidiOut, notedisplay.stopContinuousTimeUpdate
+      );
     }
   }
 

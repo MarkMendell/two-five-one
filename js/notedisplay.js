@@ -18,6 +18,8 @@ var notedisplay = {};
     NOTE_HEIGHT: 3,
     // Space (px) between each note vertically
     NOTE_GAP: 1,
+    // Width (px) of the line indicating where in the recording we are
+    TIME_BAR_WIDTH: 2,
     // How many pixels correspond to a millisecond of time
     PX_PER_MS: 0.1,
     // Color of normal, unselected note
@@ -28,9 +30,13 @@ var notedisplay = {};
     NOTE_MOUSEDOWN_COLOR: "darkgrey",
     // Color of note that is currently selected
     NOTE_SELECTED_COLOR: "silver",
+    // Color of the line indicating where in the timeline we are
+    TIME_BAR_COLOR: "lightsteelblue",
     // Keys that can be pressed to delete a selection
     DELETE_KEYS: ["Backspace", "Delete", "x"],
     //// Variables
+    // SVG containing a line that represents time location
+    timeBarSvg: undefined,
     // Canvas used for displaying the notes
     noteCanvas: undefined,
     // Internal notes list used as model (never modified)
@@ -45,8 +51,38 @@ var notedisplay = {};
     // (since a canvas element can never be actually in focus)
     isFocused: false,
     // Callback for when a note is 'deleted' by the user
-    deleteCallback: undefined
+    deleteCallback: undefined,
+    // Whether the time bar is being continously updated
+    isContinuouslyUpdatingTime: false
   };
+
+  /**
+   * Return the height (px) of the display.
+   */
+  function getDisplayHeight() {
+    return (globals.NOTE_HEIGHT + globals.NOTE_GAP) * 128;
+  }
+
+  /**
+   * Given the container element housing the display, create and append an SVG
+   * element with a line inside. This line will correspond to where in the score
+   * the next playback or record event will start.
+   */
+  function initTimeBarSvg(container) {
+    var svgNs = "http://www.w3.org/2000/svg";
+    globals.timeBarSvg = document.createElementNS(svgNs, "svg");
+    var timeBarLine = document.createElementNS(svgNs, "line");
+    globals.timeBarSvg.appendChild(timeBarLine);
+    timeBarLine.setAttributeNS(null, "x1", 0);
+    timeBarLine.setAttributeNS(null, "x2", 0);
+    timeBarLine.setAttributeNS(null, "y1", 0);
+    timeBarLine.setAttributeNS(null, "stroke", globals.TIME_BAR_COLOR);
+    globals.timeBarSvg.setAttributeNS(null, "width", globals.TIME_BAR_WIDTH);
+    timeBarLine.setAttributeNS(null, "stroke-width", globals.TIME_BAR_WIDTH);
+    globals.timeBarSvg.setAttributeNS(null, "height", getDisplayHeight());
+    timeBarLine.setAttributeNS(null, "y2", getDisplayHeight());
+    container.appendChild(globals.timeBarSvg);
+  }
 
   /**
    * Mouse events store coordinates relative to parts of the page or screen, not
@@ -256,14 +292,10 @@ var notedisplay = {};
   }
 
   /**
-   * Initialize the canvases used for the display as children of the provided
-   * element. The deleteCallback will be called with the argument of a note if
-   * the user ever tries to 'delete' said note.
-   *
-   * This function must be called first before you can use other display
-   * functions.
+   * Given the container element housing the display, create and append a canvas
+   * object that will be used for displaying notes.
    */
-  notedisplay.init = function(container, deleteCallback) {
+  function initNoteCanvas(container) {
     globals.noteCanvas = document.createElement("canvas");
     globals.noteCanvas.width = 0;
     globals.noteCanvas.height = 0;
@@ -274,6 +306,19 @@ var notedisplay = {};
     globals.noteCanvas.addEventListener("mouseup", onMouseUpNoteCanvas);
     document.addEventListener("keydown", onKeyDownDocument);
     container.appendChild(globals.noteCanvas);
+  }
+
+  /**
+   * Initialize the canvases used for the display as children of the provided
+   * element. The deleteCallback will be called with the argument of a note if
+   * the user ever tries to 'delete' said note.
+   *
+   * This function must be called first before you can use other display
+   * functions.
+   */
+  notedisplay.init = function(container, deleteCallback) {
+    initTimeBarSvg(container);
+    initNoteCanvas(container);
     globals.deleteCallback = deleteCallback;
   };
 
@@ -298,12 +343,10 @@ var notedisplay = {};
     clearMouseDown()
     clearSelection();
     clearHighlight();
-    var maxTime = globals.notes.reduce(function(prevMax, note) {
-      return Math.max(prevMax, note.end);
-    }, 0);
+    var maxTime = util.getMaxTime(globals.notes);
     // Setting the width/height clears the canvas as well
     globals.noteCanvas.width = Math.ceil(maxTime * globals.PX_PER_MS);
-    globals.noteCanvas.height = (globals.NOTE_HEIGHT + globals.NOTE_GAP) * 128;
+    globals.noteCanvas.height = getDisplayHeight();
     var ctx = globals.noteCanvas.getContext("2d");
     globals.notes.forEach(function(note) { drawNote(note, ctx); });
   }
@@ -318,5 +361,38 @@ var notedisplay = {};
   notedisplay.showNotes = function(notes) {
     setNotes(notes);
     refreshDisplay();
+  };
+
+  /**
+   * Move the time bar to the location corresponding to the provided time (ms).
+   */
+  notedisplay.showTime = function(time) {
+    var offset = globals.PX_PER_MS * time;
+    globals.timeBarSvg.style.transform = "translate(" + offset + "px)";
+  };
+
+  /**
+   * This function starts a continous animation loop that will update the
+   * location of the time bar to match what the provided callback returns as the
+   * current time (ms).
+   */
+  notedisplay.startContinuousTimeUpdate = function(getTime) {
+    if (!globals.isContinuouslyUpdatingTime) {
+      globals.isContinuouslyUpdatingTime = true;
+      var onAnimationFrame = function() {
+        if (globals.isContinuouslyUpdatingTime) {
+          notedisplay.showTime(getTime());
+          window.requestAnimationFrame(onAnimationFrame);
+        }
+      };
+      window.requestAnimationFrame(onAnimationFrame);
+    }
+  };
+
+  /**
+   * Stops continuously checking and updating the time bar's location.
+   */
+  notedisplay.stopContinuousTimeUpdate = function() {
+    globals.isContinuouslyUpdatingTime = false;
   };
 })();
