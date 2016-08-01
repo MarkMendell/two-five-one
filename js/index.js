@@ -74,16 +74,70 @@ var index = {};
   }
 
   /**
+   * Given two lists of notes, return one list of notes where overlapping notes
+   * (same note value and start while another is still sounding) become a single
+   * note whose duration is the union of both notes' durations. This function
+   * assumes that both note lists are in increasing order in terms of their
+   * start, and that they don't themselves contain overlaps. The reason for an
+   * "old" and "new" designation is because the merged note needs a velocity, so
+   * we go with the newer velocity.
+   *
+   * The algorithm is simple: for each note in one list, if it overlaps with a
+   * note in the other list, remove the other list's note and combine it with
+   * this one, then try to merge this combined note and repeat until the note
+   * doesn't overlap with any and you can insert it into the list. (O(n^2))
+   */
+  function mergeNotes(oldNotes, newNotes) {
+    var mergedNotes = util.noteListCopy(oldNotes);
+    var areOverlapping = function(note1, note2) {
+      return (note1.note === note2.note) &&
+        (!((note2.end < note1.start) || (note2.start > note1.end)));
+    };
+    for (var newNote_i=0; newNote_i<newNotes.length; newNote_i++) {
+      var mergingNote = newNotes[newNote_i];
+      var merged_i = 0;
+      while (merged_i < mergedNotes.length) {
+        mergedNote = mergedNotes[merged_i];
+        if (areOverlapping(mergingNote, mergedNote)) {
+          mergingNote = {
+            note: mergingNote.note,
+            start: Math.min(mergingNote.start, mergedNote.start),
+            end: Math.max(mergingNote.end, mergedNote.end),
+            velocity: mergingNote.velocity
+          };
+          mergedNotes.splice(merged_i, 1);
+          merged_i = 0;
+        } else {
+          merged_i += 1;
+        }
+      }
+      var wasAdded = false;
+      for (var i=0; i<mergedNotes.length; i++) {
+        var mergedNote = mergedNotes[i];
+        if (mergedNote.start > mergingNote.start) {
+          mergedNotes.splice(i, 0, mergingNote);
+          wasAdded = true;
+          break;
+        }
+      }
+      if (!wasAdded) {
+        mergedNotes.push(mergingNote);
+      }
+    }
+    return mergedNotes;
+  }
+
+  /**
    * Stop recording any more incoming MIDI events. If there are any hanging
    * notes left (i.e. notes that had NoteOn but no NoteOff), save them as though
-   * they just got a NoteOff.
+   * they just got a NoteOff. Merge the newly recorded notes with the ones that
+   * were already recorded, combining overlapping notes to be a single note
+   * covering the union of their duration.
    */
   function onPressStopRecord() {
     var recordedNotes = record.stop();
-    if (recordedNotes.length > 0) {
-      globals.notes = recordedNotes;
-      notedisplay.showNotes(globals.notes);
-    }
+    globals.notes = mergeNotes(globals.notes, recordedNotes);
+    notedisplay.showNotes(globals.notes);
   }
 
   /**
