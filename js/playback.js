@@ -21,23 +21,33 @@ var playback = {};
     playbackIntervalId: undefined,
     // Time (ms) from page load to when playback started
     startPlaybackTime: undefined,
+    // Time (ms) from page load to when playback must be done
+    endPlaybackTime: undefined,
     // Index of the next note in recordedNotes that we need to schedule for
     // playback
-    playbackIndex: 0
+    playbackIndex: 0,
+    // Function to call when playback is finished or stopped
+    stopCallback: undefined
   };
 
   // Whether playback scheduling is going on currently
   playback.isPlaying = false;
 
   /**
-   * Stops scheduling notes for playback and resets the playback index.
+   * Stops scheduling notes for playback and resets the playback index,
+   * returning the time (ms, relative to the start) at which stop was called.
    */
   playback.stop = function() {
+    var stopTime = playback.getTime();
     if (playback.isPlaying) {
       clearInterval(globals.playbackIntervalId);
       playback.isPlaying = false;
       globals.playbackIndex = 0;
+      if (globals.stopCallback) {
+        globals.stopCallback();
+      }
     }
+    return stopTime;
   };
 
   /**
@@ -52,7 +62,9 @@ var playback = {};
     var maxIndex = globals.notes.length;
     while (true) {
       if (globals.playbackIndex >= maxIndex) {
-        playback.stop();
+        if (globals.endPlaybackTime <= currentTime) {
+          playback.stop();
+        }
         break;
       } else {
         var noteObj = globals.notes[globals.playbackIndex];
@@ -75,7 +87,8 @@ var playback = {};
   /**
    * Given a list of notes and a MIDIOutput object, stop whatever is currently
    * playing and start playing back the provided notes through the MIDIOutput
-   * device.
+   * device from the provided time (ms, relative to start), calling the
+   * stopCallback when the playback is finished or stopped.
    *
    * Recorded notes are each an object with attributes:
    * - note: integer MIDI note value (middle C is 60)
@@ -87,16 +100,43 @@ var playback = {};
    * Playback occurs by scheduling PLAYBACK_LOOKAHEAD ms of notes every
    * PLAYBACK_LOOKAHEAD ms.
    */
-  playback.play = function(notes, midiOut) {
+  playback.play = function(notes, midiOut, startTime, stopCallback) {
     if (playback.isPlaying) {
       playback.stop();
     }
     playback.isPlaying = true;
     globals.midiOut = midiOut;
     globals.notes = notes;
+    var hasRemainingNote = false;
+    for (var i=0; i<globals.notes.length; i++) {
+      var noteStart = globals.notes[i].start;
+      if (globals.notes[i].start >= startTime) {
+        hasRemainingNote = true;
+        globals.playbackIndex = i;
+        break;
+      }
+    }
+    if (!hasRemainingNote) {
+      globals.playbackIndex = globals.notes.length;
+    }
+    var maxTime = util.getMaxTime(globals.notes);
     globals.playbackIntervalId = setInterval(
       schedulePlaybackSection, globals.PLAYBACK_INTERVAL
     );
-    globals.startPlaybackTime = performance.now();
+    globals.startPlaybackTime = performance.now() - startTime;
+    globals.endPlaybackTime = globals.startPlaybackTime + maxTime;
+    globals.stopCallback = stopCallback;
+  };
+
+  /**
+   * Return the time (ms) of the playback's current location. If not currently
+   * playing, return 0.
+   */
+  playback.getTime = function() {
+    if (playback.isPlaying) {
+      return performance.now() - globals.startPlaybackTime;
+    } else {
+      return 0;
+    }
   };
 })()
