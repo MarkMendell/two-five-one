@@ -202,12 +202,21 @@ var index = {};
   }
 
   /**
+   * Called by notedisplay when the user wants to seek to another position in
+   * time.
+   */
+  function onSetTime(time) {
+    globals.time = time;
+    notedisplay.showTime(time);
+  }
+
+  /**
    * Initialize the page - called once and first on load.
    */
   index.init = function() {
     initEventListeners();
     var displayContainer = document.getElementById("record-display");
-    notedisplay.init(displayContainer, onDeleteNote);
+    notedisplay.init(displayContainer, onDeleteNote, onSetTime);
     navigator.requestMIDIAccess().then(function(midiAccess) {
       globals.midiAccess = midiAccess;
       onPressRefreshInputs();
