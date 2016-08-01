@@ -87,6 +87,24 @@ var index = {};
   }
 
   /**
+   * Stop and reset playback.
+   */
+  function onPressStopPlay() {
+    playback.stop();
+    globals.time = 0;
+    notedisplay.showTime(globals.time);
+  }
+
+  /**
+   * Forget all recorded notes and reset the time bar.
+   */
+  function onPressClear() {
+    onPressStopPlay();
+    globals.notes = [];
+    notedisplay.showNotes(globals.notes);
+  }
+
+  /**
    * Return the MIDIOutput object corresponding to the choice currently
    * selected.
    */
@@ -94,15 +112,6 @@ var index = {};
     var midiOutputSelect = document.getElementById("outputs");
     var midiOutputKey = midiOutputSelect.value;
     return globals.midiAccess.outputs.get(midiOutputKey);
-  }
-
-  /**
-   * Stop and reset playback.
-   */
-  function onPressStopPlay() {
-    playback.stop();
-    globals.time = 0;
-    notedisplay.showTime(globals.time);
   }
 
   /**
@@ -163,6 +172,8 @@ var index = {};
     recordButton.addEventListener("click", onPressRecord);
     var stopRecordButton = document.getElementById("stop-record");
     stopRecordButton.addEventListener("click", onPressStopRecord);
+    var clearButton = document.getElementById("clear");
+    clearButton.addEventListener("click", onPressClear);
     var playButton = document.getElementById("play");
     playButton.addEventListener("click", onPressPlay);
     var pauseButton = document.getElementById("pause");
