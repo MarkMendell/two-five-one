@@ -77,15 +77,21 @@ var record = {};
 
   /**
    * Stop saving incoming MIDI events as new recorded notes and mark any hanging
-   * notes as though their NoteOff event happened right now.
+   * notes as though their NoteOff event happened right now. Return a list of
+   * the notes recorded in order.
    */
   record.stop = function() {
     var end = performance.now() - globals.startTime;
-    record.isRecording = false;
-    for (var noteValue in globals.hangingNotes) {
-      var noteObj = record.notes[globals.hangingNotes[noteValue]];
-      noteObj.end = end;
-      delete globals.hangingNotes[noteValue];
+    if (record.isRecording) {
+      record.isRecording = false;
+      for (var noteValue in globals.hangingNotes) {
+        var noteObj = record.notes[globals.hangingNotes[noteValue]];
+        noteObj.end = end;
+        delete globals.hangingNotes[noteValue];
+      }
+      return util.noteListCopy(record.notes);
+    } else {
+      return [];
     }
   };
 })();

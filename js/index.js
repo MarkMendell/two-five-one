@@ -12,7 +12,9 @@ var index = {};
   // Global variables used across functions
   var globals = {
     // MIDIAccess object for interfacing with web MIDI API
-    midiAccess: undefined
+    midiAccess: undefined,
+    // Notes that exist for playback
+    notes: []
   };
 
   /**
@@ -74,10 +76,10 @@ var index = {};
    * they just got a NoteOff.
    */
   function onPressStopRecord() {
-    record.stop();
-    if (record.notes.length > 0) {
-      var displayCanvas = document.getElementById("record-display");
-      notedisplay.showNotes(record.notes, displayCanvas);
+    var recordedNotes = record.stop();
+    if (recordedNotes.length > 0) {
+      globals.notes = recordedNotes;
+      notedisplay.showNotes(globals.notes);
     }
   }
 
@@ -110,7 +112,7 @@ var index = {};
     if (playbackMidiOut === undefined) {
       alert("No MIDI out selected.");
     } else {
-      playback.play(record.notes, playbackMidiOut);
+      playback.play(globals.notes, playbackMidiOut);
     }
   }
 
@@ -143,10 +145,40 @@ var index = {};
   }
 
   /**
+   * Given two notes, return true if the two notes are equal (same attributes)
+   * and false otherwise.
+   */
+  function noteEquals(note1, note2) {
+    var properties = ["start", "end", "note", "velocity"];
+    for (var i=0; i<properties.length; i++) {
+      if (note1[properties[i]] !== note2[properties[i]]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * This function is called by notedisplay when a user has 'deleted' a note. We
+   * then perform the deletion and refresh the display with the updated model.
+   */
+  function onDeleteNote(note) {
+    for (var i=0; i<globals.notes.length; i++) {
+      if (noteEquals(note, globals.notes[i])) {
+        globals.notes.splice(i, 1);
+        break;
+      }
+    }
+    notedisplay.showNotes(globals.notes);
+  }
+
+  /**
    * Initialize the page - called once and first on load.
    */
   index.init = function() {
     initEventListeners();
+    var displayContainer = document.getElementById("record-display");
+    notedisplay.init(displayContainer, onDeleteNote);
     navigator.requestMIDIAccess().then(function(midiAccess) {
       globals.midiAccess = midiAccess;
       onPressRefreshInputs();
