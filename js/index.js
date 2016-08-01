@@ -14,7 +14,10 @@ var index = {};
     // MIDIAccess object for interfacing with web MIDI API
     midiAccess: undefined,
     // Notes that exist for playback
-    notes: []
+    notes: [],
+    // Time (ms, relative to start) where the next playback or record event will
+    // start from
+    time: 0
   };
 
   /**
@@ -98,6 +101,8 @@ var index = {};
    */
   function onPressStopPlay() {
     playback.stop();
+    globals.time = 0;
+    notedisplay.showTime(globals.time);
   }
 
   /**
@@ -105,6 +110,9 @@ var index = {};
    * notes.
    */
   function onPressPlay() {
+    if (playback.isPlaying) {
+      return;
+    }
     if (record.isRecording) {
       onPressStopRecord();
     }
@@ -114,8 +122,24 @@ var index = {};
     } else {
       notedisplay.startContinuousTimeUpdate(playback.getTime);
       playback.play(
-        globals.notes, playbackMidiOut, notedisplay.stopContinuousTimeUpdate
+        globals.notes, playbackMidiOut, globals.time,
+        function() {
+          notedisplay.stopContinuousTimeUpdate();
+          globals.time = 0;
+          notedisplay.showTime(globals.time);
+        }
       );
+    }
+  }
+
+  /**
+   * Stop playback and save the position for starting at the same time next
+   * play.
+   */
+  function onPressPause() {
+    if (playback.isPlaying) {
+      globals.time = playback.stop();
+      notedisplay.showTime(globals.time);
     }
   }
 
@@ -141,6 +165,8 @@ var index = {};
     stopRecordButton.addEventListener("click", onPressStopRecord);
     var playButton = document.getElementById("play");
     playButton.addEventListener("click", onPressPlay);
+    var pauseButton = document.getElementById("pause");
+    pauseButton.addEventListener("click", onPressPause);
     var stopPlayButton = document.getElementById("stop-play");
     stopPlayButton.addEventListener("click", onPressStopPlay);
     var panicButton = document.getElementById("panic");

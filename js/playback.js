@@ -34,9 +34,11 @@ var playback = {};
   playback.isPlaying = false;
 
   /**
-   * Stops scheduling notes for playback and resets the playback index.
+   * Stops scheduling notes for playback and resets the playback index,
+   * returning the time (ms, relative to the start) at which stop was called.
    */
   playback.stop = function() {
+    var stopTime = playback.getTime();
     if (playback.isPlaying) {
       clearInterval(globals.playbackIntervalId);
       playback.isPlaying = false;
@@ -45,6 +47,7 @@ var playback = {};
         globals.stopCallback();
       }
     }
+    return stopTime;
   };
 
   /**
@@ -84,7 +87,8 @@ var playback = {};
   /**
    * Given a list of notes and a MIDIOutput object, stop whatever is currently
    * playing and start playing back the provided notes through the MIDIOutput
-   * device, calling the stopCallback when the playback is finished or stopped.
+   * device from the provided time (ms, relative to start), calling the
+   * stopCallback when the playback is finished or stopped.
    *
    * Recorded notes are each an object with attributes:
    * - note: integer MIDI note value (middle C is 60)
@@ -96,18 +100,30 @@ var playback = {};
    * Playback occurs by scheduling PLAYBACK_LOOKAHEAD ms of notes every
    * PLAYBACK_LOOKAHEAD ms.
    */
-  playback.play = function(notes, midiOut, stopCallback) {
+  playback.play = function(notes, midiOut, startTime, stopCallback) {
     if (playback.isPlaying) {
       playback.stop();
     }
     playback.isPlaying = true;
     globals.midiOut = midiOut;
     globals.notes = notes;
+    var hasRemainingNote = false;
+    for (var i=0; i<globals.notes.length; i++) {
+      var noteStart = globals.notes[i].start;
+      if (globals.notes[i].start >= startTime) {
+        hasRemainingNote = true;
+        globals.playbackIndex = i;
+        break;
+      }
+    }
+    if (!hasRemainingNote) {
+      globals.playbackIndex = globals.notes.length;
+    }
     var maxTime = util.getMaxTime(globals.notes);
     globals.playbackIntervalId = setInterval(
       schedulePlaybackSection, globals.PLAYBACK_INTERVAL
     );
-    globals.startPlaybackTime = performance.now();
+    globals.startPlaybackTime = performance.now() - startTime;
     globals.endPlaybackTime = globals.startPlaybackTime + maxTime;
     globals.stopCallback = stopCallback;
   };
