@@ -70,6 +70,7 @@ var index = {};
     var midiInputSelect = document.getElementById("inputs");
     var midiInputKey = midiInputSelect.value;
     var midiInput = globals.midiAccess.inputs.get(midiInputKey);
+    notedisplay.startContinuousTimeUpdate(record.getTime);
     record.start(midiInput);
   }
 
@@ -136,6 +137,8 @@ var index = {};
    */
   function onPressStopRecord() {
     var recordedNotes = record.stop();
+    notedisplay.stopContinuousTimeUpdate();
+    notedisplay.showTime(globals.time);
     globals.notes = mergeNotes(globals.notes, recordedNotes);
     notedisplay.showNotes(globals.notes);
   }
