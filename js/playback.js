@@ -14,9 +14,15 @@ var playback = {};
     // For each batch of scheduling, the amount of time (ms) to schedule note
     // playback for
     PLAYBACK_LOOKAHEAD: 100,
+    // Time (ms) to add to waiting before playing back to allow the optional
+    // AudioBufferSourceNode to start in sync with the MIDI events
+    SYNC_PAD: 100,
     //// Variables
     // MIDIOutput object for sending playback MIDI events to
     midiOut: undefined,
+    // AudioBufferSourceNode of the original song being transcribed (may be
+    // undefined)
+    bufferSource: undefined,
     // ID returned by setInterval for the function scheduling blocks of playback
     playbackIntervalId: undefined,
     // Time (ms) from page load to when playback started
@@ -41,6 +47,9 @@ var playback = {};
     var stopTime = playback.getTime();
     if (playback.isPlaying) {
       clearInterval(globals.playbackIntervalId);
+      if (globals.bufferSource) {
+        globals.bufferSource.stop();
+      }
       playback.isPlaying = false;
       globals.playbackIndex = 0;
       if (globals.stopCallback) {
@@ -85,10 +94,20 @@ var playback = {};
   }
 
   /**
-   * Given a list of notes and a MIDIOutput object, stop whatever is currently
-   * playing and start playing back the provided notes through the MIDIOutput
-   * device from the provided time (ms, relative to start), calling the
-   * stopCallback when the playback is finished or stopped.
+   * Given a list of notes, a MIDIOutput object, and optionally an AudioBuffer
+   * and AudioContext, stop whatever is currently playing and start playing back
+   * the provided notes through the MIDIOutput device from the provided time
+   * (ms, relative to start), calling the stopCallback when the playback is
+   * finished or stopped, while simultaneously playing back the AudioBuffer (if
+   * provided) with the given AudioContext.
+   *
+   * The function takes in an argument object with the following attributes:
+   * - notes: list of recorded note objects to play back (see below)
+   * - midiOut: MIDIOutput device to send the MIDI messages to
+   * - startTime: integer time (ms) to start the notes and audio playback from
+   * - stopCallback: function called when playback is stopped early or finished
+   * - audioBuffer: AudioBuffer object to play in sync with the notes (optional)
+   * - audioContext: AudioContext object for audio buffer playback (if provided)
    *
    * Recorded notes are each an object with attributes:
    * - note: integer MIDI note value (middle C is 60)
@@ -100,17 +119,17 @@ var playback = {};
    * Playback occurs by scheduling PLAYBACK_LOOKAHEAD ms of notes every
    * PLAYBACK_LOOKAHEAD ms.
    */
-  playback.play = function(notes, midiOut, startTime, stopCallback) {
+  playback.play = function(args) {
     if (playback.isPlaying) {
       playback.stop();
     }
     playback.isPlaying = true;
-    globals.midiOut = midiOut;
-    globals.notes = notes;
+    globals.midiOut = args.midiOut;
+    globals.notes = args.notes;
     var hasRemainingNote = false;
     for (var i=0; i<globals.notes.length; i++) {
       var noteStart = globals.notes[i].start;
-      if (globals.notes[i].start >= startTime) {
+      if (globals.notes[i].start >= args.startTime) {
         hasRemainingNote = true;
         globals.playbackIndex = i;
         break;
@@ -120,12 +139,22 @@ var playback = {};
       globals.playbackIndex = globals.notes.length;
     }
     var maxTime = util.getMaxTime(globals.notes);
+    var now = performance.now();
+    globals.startPlaybackTime = now - args.startTime + globals.SYNC_PAD;
+    if (args.audioBuffer) {
+      maxTime = Math.max(maxTime, args.audioBuffer.duration * 1000);
+      globals.bufferSource = args.audioContext.createBufferSource();
+      globals.bufferSource.buffer = args.audioBuffer;
+      globals.bufferSource.connect(args.audioContext.destination);
+      globals.bufferSource.start(
+        (now + globals.SYNC_PAD) / 1000.0, args.startTime / 1000.0
+      );
+    }
     globals.playbackIntervalId = setInterval(
       schedulePlaybackSection, globals.PLAYBACK_INTERVAL
     );
-    globals.startPlaybackTime = performance.now() - startTime;
     globals.endPlaybackTime = globals.startPlaybackTime + maxTime;
-    globals.stopCallback = stopCallback;
+    globals.stopCallback = args.stopCallback;
   };
 
   /**
@@ -134,6 +163,14 @@ var playback = {};
    */
   playback.getTime = function() {
     if (playback.isPlaying) {
+      // Scheduling is done relative to a start playback time. When we want to
+      // start later, we just lie and say the start playback time was earlier
+      // than it actually was. What this means is that we can technically be
+      // briefly playing back in a time before the actual startPlaybackTime.
+      // Thus, for the first SYNC_PAD ms after playback is initiated, the time
+      // returned will be actual-starting-time - SYNC_PAD + time-since-play. We
+      // work around this by passing notedisplay a minimum time (the actual
+      // starting time) that it will never go below.
       return performance.now() - globals.startPlaybackTime;
     } else {
       return 0;

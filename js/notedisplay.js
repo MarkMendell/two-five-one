@@ -363,13 +363,14 @@ var notedisplay = {};
    * Using the internal list of notes as a model, clear the current display and
    * draw a new one.
    */
-  function refreshDisplay() {
+  function refreshDisplay(minWidth) {
     clearMouseDown()
     clearSelection();
     clearHighlight();
     var maxTime = util.getMaxTime(globals.notes);
     // Setting the width/height clears the canvas as well
-    globals.noteCanvas.width = Math.ceil(maxTime * globals.PX_PER_MS);
+    var notesWidth = Math.ceil(maxTime * globals.PX_PER_MS);
+    globals.noteCanvas.width = Math.max(minWidth, notesWidth);
     globals.noteCanvas.height = getDisplayHeight();
     var ctx = globals.noteCanvas.getContext("2d");
     globals.notes.forEach(function(note) { drawNote(note, ctx); });
@@ -381,10 +382,18 @@ var notedisplay = {};
    * - start: double representing time (ms) the note begins
    * - end: double representing time (ms) the note ends
    * - note: integer MIDI note value (60 is middle C)
+   * The second argument, audioBuffer (which may be undefined), if present,
+   * determines the minimum length of the noteCanvas so that it is at least as
+   * long as the song.
    */
-  notedisplay.showNotes = function(notes) {
+  notedisplay.showNotes = function(notes, audioBuffer) {
     setNotes(notes);
-    refreshDisplay();
+    if (audioBuffer) {
+      var minWidth = (audioBuffer.duration * 1000.0) * globals.PX_PER_MS;
+    } else {
+      var minWidth = 0;
+    }
+    refreshDisplay(minWidth);
   };
 
   /**
@@ -398,14 +407,17 @@ var notedisplay = {};
   /**
    * This function starts a continous animation loop that will update the
    * location of the time bar to match what the provided callback returns as the
-   * current time (ms).
+   * current time (ms), never going below the minTime.
+   *
+   * See playback.getTime for why minTime is necessary.
    */
-  notedisplay.startContinuousTimeUpdate = function(getTime) {
+  notedisplay.startContinuousTimeUpdate = function(getTime, minTime) {
     if (!globals.isContinuouslyUpdatingTime) {
       globals.isContinuouslyUpdatingTime = true;
       var onAnimationFrame = function() {
         if (globals.isContinuouslyUpdatingTime) {
-          notedisplay.showTime(getTime());
+          var time = Math.max(minTime, getTime());
+          notedisplay.showTime(time);
           window.requestAnimationFrame(onAnimationFrame);
         }
       };
