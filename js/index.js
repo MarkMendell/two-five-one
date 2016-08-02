@@ -274,6 +274,19 @@ var index = {};
   }
 
   /**
+   * Shows or hides the key bindings section.
+   */
+  function onClickKeysToggle() {
+    if (this.innerText === "[show]") {
+      this.nextSibling.nextSibling.style.display = "block";
+      this.innerText = "[hide]";
+    } else {
+      this.nextSibling.nextSibling.style.display = "none";
+      this.innerText = "[show]";
+    }
+  }
+
+  /**
    * Set up the functions to get called when a user clicks on record, play, etc.
    */
   function initEventListeners() {
@@ -299,6 +312,8 @@ var index = {};
     stopPlayButton.addEventListener("click", onPressStopPlay);
     var panicButton = document.getElementById("panic");
     panicButton.addEventListener("click", onPressPanic);
+    var keysToggleElem = document.getElementById("keys-toggle");
+    keysToggleElem.addEventListener("click", onClickKeysToggle);
   }
 
   /**
