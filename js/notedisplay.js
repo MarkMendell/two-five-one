@@ -64,6 +64,8 @@ var notedisplay = {};
     setTimeCallback: undefined,
     // Callback for when the user toggles play/pause
     playPauseCallback: undefined,
+    // Callback for when the user toggles play/pause (keep spot)
+    playPauseKeepSpotCallback: undefined,
     // Whether the time bar is being continously updated
     isContinuouslyUpdatingTime: false
   };
@@ -317,7 +319,11 @@ var notedisplay = {};
         globals.deleteCallback(globals.selectedNote);
       }
     } else if (keyboardEvent.key === globals.PLAY_PAUSE_KEY) {
-      if (globals.playPauseCallback) {
+      if (keyboardEvent.shiftKey) {
+        if (globals.playPauseKeepSpotCallback) {
+          globals.playPauseKeepSpotCallback();
+        }
+      } else if (globals.playPauseCallback) {
         globals.playPauseCallback();
       }
     }
@@ -351,12 +357,13 @@ var notedisplay = {};
    * functions.
    */
   notedisplay.init = function(container, deleteCallback, setTimeCallback,
-      playPauseCallback) {
+      playPauseCallback, playPauseKeepSpotCallback) {
     initTimeBarSvg(container);
     initNoteCanvas(container);
     globals.deleteCallback = deleteCallback;
     globals.setTimeCallback = setTimeCallback;
     globals.playPauseCallback = playPauseCallback;
+    globals.playPauseKeepSpotCallback = playPauseKeepSpotCallback;
   };
 
   /**

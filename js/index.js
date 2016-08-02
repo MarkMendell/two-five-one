@@ -367,13 +367,25 @@ var index = {};
   }
 
   /**
+   * If playing, pause while keeping the original spot, and vice versa.
+   */
+  function togglePlayPauseKeepSpot() {
+    if (playback.isPlaying) {
+      onPressPauseKeepSpot();
+    } else {
+      onPressPlay();
+    }
+  }
+
+  /**
    * Initialize the page - called once and first on load.
    */
   index.init = function() {
     initEventListeners();
     var displayContainer = document.getElementById("record-display");
     notedisplay.init(
-      displayContainer, onDeleteNote, onSetTime, togglePlayPause
+      displayContainer, onDeleteNote, onSetTime, togglePlayPause,
+      togglePlayPauseKeepSpot
     );
     navigator.requestMIDIAccess().then(function(midiAccess) {
       globals.midiAccess = midiAccess;
