@@ -92,6 +92,19 @@ var index = {};
   }
 
   /**
+   * Forget the audio buffer of any previously laoded audio file.
+   */
+  function onPressClearAudio() {
+    if (playback.isPlaying) {
+      playback.stop();
+    }
+    globals.audioBuffer = undefined;
+    notedisplay.showNotes(globals.notes, globals.audioBuffer);
+    var statusElem = document.getElementById("load-audio-status");
+    statusElem.textContent = "Cleared.";
+  }
+
+  /**
    * Stop playback and start saving MIDI events from the selected input as note
    * objects.
    */
@@ -315,6 +328,8 @@ var index = {};
     refreshOutputsButton.addEventListener("click", onPressRefreshOutputs);
     var loadAudioButton = document.getElementById("load-audio");
     loadAudioButton.addEventListener("click", onPressLoadAudio);
+    var clearAudioButton = document.getElementById("clear-audio");
+    clearAudioButton.addEventListener("click", onPressClearAudio);
     var recordButton = document.getElementById("record");
     recordButton.addEventListener("click", onPressRecord);
     var stopRecordButton = document.getElementById("stop-record");
