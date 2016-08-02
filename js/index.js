@@ -70,7 +70,9 @@ var index = {};
     var midiInputSelect = document.getElementById("inputs");
     var midiInputKey = midiInputSelect.value;
     var midiInput = globals.midiAccess.inputs.get(midiInputKey);
-    notedisplay.startContinuousTimeUpdate(record.getTime);
+    notedisplay.startContinuousTimeUpdate(function() {
+      return globals.time + record.getTime();
+    });
     record.start(midiInput);
   }
 
@@ -139,6 +141,10 @@ var index = {};
     var recordedNotes = record.stop();
     notedisplay.stopContinuousTimeUpdate();
     notedisplay.showTime(globals.time);
+    recordedNotes.forEach(function(note) {
+      note.start += globals.time;
+      note.end += globals.time;
+    });
     globals.notes = mergeNotes(globals.notes, recordedNotes);
     notedisplay.showNotes(globals.notes);
   }
@@ -274,8 +280,10 @@ var index = {};
    * time.
    */
   function onSetTime(time) {
-    globals.time = time;
-    notedisplay.showTime(time);
+    if (!(record.isRecording || playback.isPlaying)) {
+      globals.time = time;
+      notedisplay.showTime(time);
+    }
   }
 
   /**
