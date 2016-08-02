@@ -97,7 +97,7 @@ var index = {};
    */
   function onPressRecord() {
     if (playback.isPlaying) {
-      playback.stop();
+      onPressPause();
     }
     var midiInputSelect = document.getElementById("inputs");
     var midiInputKey = midiInputSelect.value;
@@ -105,7 +105,19 @@ var index = {};
     notedisplay.startContinuousTimeUpdate(function() {
       return globals.time + record.getTime();
     }, globals.time);
-    record.start(midiInput);
+    var recordStartTime = record.start(midiInput);
+    var playbackStartTime = playback.play({
+      notes: [],
+      startTime: globals.time,
+      audioBuffer: globals.audioBuffer,
+      audioContext: globals.audioContext
+    });
+    // We can't start recording with precise timing, so we instead get a close
+    // estimate of when recording started, when playback started, and add the
+    // difference to our time variable so that when the recorded notes get
+    // merged in, they're relative to the timing heard in the original audio
+    // playback.
+    globals.time += recordStartTime - playbackStartTime;
   }
 
   /**
@@ -173,13 +185,20 @@ var index = {};
     if (record.isRecording) {
       var recordedNotes = record.stop();
       notedisplay.stopContinuousTimeUpdate();
-      notedisplay.showTime(globals.time);
       recordedNotes.forEach(function(note) {
         note.start += globals.time;
         note.end += globals.time;
       });
       globals.notes = mergeNotes(globals.notes, recordedNotes);
       notedisplay.showNotes(globals.notes, globals.audioBuffer);
+      // When we subtracted the difference between the start of the recording
+      // and the start of playback, we could end up with a negative start time,
+      // so reset it to 0 now that the offset has been applied.
+      globals.time = Math.max(0, globals.time);
+      notedisplay.showTime(globals.time);
+    }
+    if (playback.isPlaying) {
+      playback.stop();
     }
   }
 

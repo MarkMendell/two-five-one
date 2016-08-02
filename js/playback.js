@@ -16,7 +16,7 @@ var playback = {};
     PLAYBACK_LOOKAHEAD: 100,
     // Time (ms) to add to waiting before playing back to allow the optional
     // AudioBufferSourceNode to start in sync with the MIDI events
-    SYNC_PAD: 100,
+    SYNC_PAD: 50,
     //// Variables
     // MIDIOutput object for sending playback MIDI events to
     midiOut: undefined,
@@ -155,6 +155,7 @@ var playback = {};
     );
     globals.endPlaybackTime = globals.startPlaybackTime + maxTime;
     globals.stopCallback = args.stopCallback;
+    return now + globals.SYNC_PAD;
   };
 
   /**

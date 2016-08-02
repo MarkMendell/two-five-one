@@ -73,6 +73,7 @@ var record = {};
     globals.startTime = performance.now();
     record.notes = [];
     record.isRecording = true;
+    return globals.startTime;
   };
 
   /**
