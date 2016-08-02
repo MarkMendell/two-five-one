@@ -34,6 +34,8 @@ var notedisplay = {};
     TIME_BAR_COLOR: "lightsteelblue",
     // Keys that can be pressed to delete a selection
     DELETE_KEYS: ["Backspace", "Delete", "x"],
+    // Key to toggle play/pause
+    PLAY_PAUSE_KEY: " ",
     //// Variables
     // SVG containing a line that represents time location
     timeBarSvg: undefined,
@@ -60,6 +62,8 @@ var notedisplay = {};
     deleteCallback: undefined,
     // Callback for when a time is seeked (sought?) by the user
     setTimeCallback: undefined,
+    // Callback for when the user toggles play/pause
+    playPauseCallback: undefined,
     // Whether the time bar is being continously updated
     isContinuouslyUpdatingTime: false
   };
@@ -304,10 +308,17 @@ var notedisplay = {};
     // Prevent browsers from going back a page when backspace is pressed
     if (keyboardEvent.key === "Backspace") {
       keyboardEvent.preventDefault();
+    // Prevent spacebar from toggling the last-clicked button
+    } else if (keyboardEvent.key === " ") {
+      keyboardEvent.preventDefault();
     }
     if (globals.DELETE_KEYS.includes(keyboardEvent.key)) {
       if (globals.selectedNote && globals.deleteCallback) {
         globals.deleteCallback(globals.selectedNote);
+      }
+    } else if (keyboardEvent.key === globals.PLAY_PAUSE_KEY) {
+      if (globals.playPauseCallback) {
+        globals.playPauseCallback();
       }
     }
   }
@@ -339,11 +350,13 @@ var notedisplay = {};
    * This function must be called first before you can use other display
    * functions.
    */
-  notedisplay.init = function(container, deleteCallback, setTimeCallback) {
+  notedisplay.init = function(container, deleteCallback, setTimeCallback,
+      playPauseCallback) {
     initTimeBarSvg(container);
     initNoteCanvas(container);
     globals.deleteCallback = deleteCallback;
     globals.setTimeCallback = setTimeCallback;
+    globals.playPauseCallback = playPauseCallback;
   };
 
   /**

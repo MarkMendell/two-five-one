@@ -356,12 +356,25 @@ var index = {};
   }
 
   /**
+   * If playing, pause, and vice versa.
+   */
+  function togglePlayPause() {
+    if (playback.isPlaying) {
+      onPressPause();
+    } else {
+      onPressPlay();
+    }
+  }
+
+  /**
    * Initialize the page - called once and first on load.
    */
   index.init = function() {
     initEventListeners();
     var displayContainer = document.getElementById("record-display");
-    notedisplay.init(displayContainer, onDeleteNote, onSetTime);
+    notedisplay.init(
+      displayContainer, onDeleteNote, onSetTime, togglePlayPause
+    );
     navigator.requestMIDIAccess().then(function(midiAccess) {
       globals.midiAccess = midiAccess;
       onPressRefreshInputs();
