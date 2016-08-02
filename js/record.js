@@ -94,4 +94,16 @@ var record = {};
       return [];
     }
   };
+
+  /**
+   * Return the time (ms) of how long the recording has been running. If the
+   * recording isn't running, 0 is returned.
+   */
+  record.getTime = function() {
+    if (record.isRecording) {
+      return performance.now() - globals.startTime;
+    } else {
+      return 0;
+    }
+  };
 })();
