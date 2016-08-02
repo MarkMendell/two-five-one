@@ -254,6 +254,18 @@ var index = {};
   }
 
   /**
+   * Stop playback but don't update the position from what is was before.
+   */
+  function onPressPauseKeepSpot() {
+    var time = globals.time;
+    if (playback.isPlaying) {
+      playback.stop();
+      globals.time = time;
+      notedisplay.showTime(globals.time);
+    }
+  }
+
+  /**
    * Send a MIDI panic signal out - AKA a NoteOff message to every single note.
    * This will silence any lingering notes waiting for a NoteOff.
    */
@@ -281,6 +293,8 @@ var index = {};
     playButton.addEventListener("click", onPressPlay);
     var pauseButton = document.getElementById("pause");
     pauseButton.addEventListener("click", onPressPause);
+    var pauseKeepSpotButton = document.getElementById("pause-keep-spot");
+    pauseKeepSpotButton.addEventListener("click", onPressPauseKeepSpot);
     var stopPlayButton = document.getElementById("stop-play");
     stopPlayButton.addEventListener("click", onPressStopPlay);
     var panicButton = document.getElementById("panic");
