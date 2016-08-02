@@ -13,6 +13,11 @@ var index = {};
   var globals = {
     // MIDIAccess object for interfacing with web MIDI API
     midiAccess: undefined,
+    // AudioContext object used for audio playback and decoding
+    audioContext: undefined,
+    // AudioBuffer object containing the decoded audio of the original song file
+    // (may be undefined)
+    audioBuffer: undefined,
     // Notes that exist for playback
     notes: [],
     // Time (ms, relative to start) where the next playback or record event will
@@ -60,6 +65,33 @@ var index = {};
   }
 
   /**
+   * Load the chosen file and save its decoded buffer to later send to the
+   * playback module.
+   */
+  function onPressLoadAudio() {
+    var statusElem = document.getElementById("load-audio-status");
+    statusElem.textContent = "Loading...";
+    var fileElem = document.getElementById("original-audio");
+    if (fileElem.files.length < 1) {
+      statusElem.textContent = "Please choose a file to upload.";
+    } else {
+      reader = new FileReader();
+      reader.onload = function() {
+        globals.audioContext.decodeAudioData(reader.result).then(
+          function(buffer) {
+            globals.audioBuffer = buffer;
+            notedisplay.showNotes(globals.notes, globals.audioBuffer);
+            statusElem.textContent = "Loaded.";
+          }, function(error) {
+            statusElem.textContent = "Failed to load: " + error;
+          }
+        );
+      };
+      reader.readAsArrayBuffer(fileElem.files[0]);
+    }
+  }
+
+  /**
    * Stop playback and start saving MIDI events from the selected input as note
    * objects.
    */
@@ -72,7 +104,7 @@ var index = {};
     var midiInput = globals.midiAccess.inputs.get(midiInputKey);
     notedisplay.startContinuousTimeUpdate(function() {
       return globals.time + record.getTime();
-    });
+    }, globals.time);
     record.start(midiInput);
   }
 
@@ -138,15 +170,17 @@ var index = {};
    * covering the union of their duration.
    */
   function onPressStopRecord() {
-    var recordedNotes = record.stop();
-    notedisplay.stopContinuousTimeUpdate();
-    notedisplay.showTime(globals.time);
-    recordedNotes.forEach(function(note) {
-      note.start += globals.time;
-      note.end += globals.time;
-    });
-    globals.notes = mergeNotes(globals.notes, recordedNotes);
-    notedisplay.showNotes(globals.notes);
+    if (record.isRecording) {
+      var recordedNotes = record.stop();
+      notedisplay.stopContinuousTimeUpdate();
+      notedisplay.showTime(globals.time);
+      recordedNotes.forEach(function(note) {
+        note.start += globals.time;
+        note.end += globals.time;
+      });
+      globals.notes = mergeNotes(globals.notes, recordedNotes);
+      notedisplay.showNotes(globals.notes, globals.audioBuffer);
+    }
   }
 
   /**
@@ -164,7 +198,7 @@ var index = {};
   function onPressClear() {
     onPressStopPlay();
     globals.notes = [];
-    notedisplay.showNotes(globals.notes);
+    notedisplay.showNotes(globals.notes, globals.audioBuffer);
   }
 
   /**
@@ -192,15 +226,19 @@ var index = {};
     if (playbackMidiOut === undefined) {
       alert("No MIDI out selected.");
     } else {
-      notedisplay.startContinuousTimeUpdate(playback.getTime);
-      playback.play(
-        globals.notes, playbackMidiOut, globals.time,
-        function() {
+      notedisplay.startContinuousTimeUpdate(playback.getTime, globals.time);
+      playback.play({
+        notes: globals.notes,
+        midiOut: playbackMidiOut,
+        startTime: globals.time,
+        audioBuffer: globals.audioBuffer,
+        audioContext: globals.audioContext,
+        stopCallback: function() {
           notedisplay.stopContinuousTimeUpdate();
           globals.time = 0;
           notedisplay.showTime(globals.time);
         }
-      );
+      });
     }
   }
 
@@ -231,6 +269,8 @@ var index = {};
     refreshInputsButton.addEventListener("click", onPressRefreshInputs);
     var refreshOutputsButton = document.getElementById("refresh-outputs");
     refreshOutputsButton.addEventListener("click", onPressRefreshOutputs);
+    var loadAudioButton = document.getElementById("load-audio");
+    loadAudioButton.addEventListener("click", onPressLoadAudio);
     var recordButton = document.getElementById("record");
     recordButton.addEventListener("click", onPressRecord);
     var stopRecordButton = document.getElementById("stop-record");
@@ -272,7 +312,7 @@ var index = {};
         break;
       }
     }
-    notedisplay.showNotes(globals.notes);
+    notedisplay.showNotes(globals.notes, globals.audioBuffer);
   }
 
   /**
@@ -300,7 +340,8 @@ var index = {};
     }, function() {
       alert("MIDI access denied.");
     });
-  }
+    globals.audioContext = new AudioContext();
+  };
 })()
 
 window.onload = index.init;
