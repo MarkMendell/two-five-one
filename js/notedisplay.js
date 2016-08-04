@@ -336,7 +336,7 @@ var notedisplay = {};
   function initNoteCanvas(container) {
     globals.noteCanvas = document.createElement("canvas");
     globals.noteCanvas.width = 0;
-    globals.noteCanvas.height = 0;
+    globals.noteCanvas.height = getDisplayHeight();
     globals.noteCanvas.addEventListener("mousemove", onMouseMoveNoteCanvas);
     globals.noteCanvas.addEventListener("mouseleave", onMouseLeaveNoteCanvas);
     globals.noteCanvas.addEventListener("mousedown", onMouseDownNoteCanvas);
