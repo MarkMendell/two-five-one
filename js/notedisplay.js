@@ -53,6 +53,8 @@ var notedisplay = {};
     highlightedNote: undefined,
     // Note that the currently held-down mouse started on when it clicked
     mouseDownNote: undefined,
+    // Note edge that the currently held-down mouse started on when it clicked
+    mouseDownNoteEdge: undefined,
     // Note currently selected
     selectedNote: undefined,
     // Keeps track of whether the canvas can be treated as being 'in focus'
