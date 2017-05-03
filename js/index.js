@@ -425,6 +425,10 @@ var index = {};
    * Initialize the page - called once and first on load.
    */
   index.init = function() {
+    if (!navigator.requestMIDIAccess) {
+      var msg = "Web MIDI support is required (try using Chrome).";
+      document.getElementById("warning").innerText = msg;
+    }
     initEventListeners();
     var displayContainer = document.getElementById("record-display");
     notedisplay.init(
