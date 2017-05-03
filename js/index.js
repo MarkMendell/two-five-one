@@ -412,13 +412,23 @@ var index = {};
   }
 
   /**
+   * Called by notedisplay when a user has 'updated' the note at the given index
+   * to the provided value.
+   */
+  function onUpdateNote(index, note) {
+    globals.notes.splice(index, 1);
+    globals.notes = mergeNotes(globals.notes, [note]);
+    notedisplay.showNotes(globals.notes, globals.audioBuffer);
+  }
+
+  /**
    * Initialize the page - called once and first on load.
    */
   index.init = function() {
     initEventListeners();
     var displayContainer = document.getElementById("record-display");
     notedisplay.init(
-      displayContainer, onDeleteNote, onSetTime, togglePlayPause,
+      displayContainer, onDeleteNote, onUpdateNote, onSetTime, togglePlayPause,
       togglePlayPauseKeepSpot
     );
     navigator.requestMIDIAccess().then(function(midiAccess) {
