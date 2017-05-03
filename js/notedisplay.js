@@ -38,6 +38,8 @@ var notedisplay = {};
     NOTE_MOUSEDOWN_COLOR: "darkgrey",
     // Color of note that is currently selected
     NOTE_SELECTED_COLOR: "silver",
+    // Color of note that is being dragged
+    NOTE_DRAG_COLOR: "orange",
     // Keys that can be pressed to delete a selection
     DELETE_KEYS: ["Backspace", "Delete", "x"],
     //// Variables
@@ -263,10 +265,36 @@ var notedisplay = {};
   }
 
   /**
+   * Erases any dragged notes.
+   */
+  function clearDrag() {
+    var ctx = globals.dragCanvas.getContext("2d");
+    ctx.clearRect(0, 0, globals.dragCanvas.width, globals.dragCanvas.height);
+  }
+
+  /**
+   * Return a copy of the note with its values shifted according to the delta
+   * between the start and end mouse event coordinates.
+   */
+  function getNoteShiftedToMouse(note, startMouseEvent, endMouseEvent) {
+    var newNote = {};
+    var dt = (endMouseEvent.x - startMouseEvent.x) / globals.PX_PER_MS;
+    var pxPerNote = globals.NOTE_HEIGHT + globals.NOTE_GAP;
+    var dNote = (startMouseEvent.y - endMouseEvent.y) / pxPerNote;
+    Object.assign(newNote, note, {
+      start: note.start + dt,
+      end: note.end + dt,
+      note: note.note + Math.floor(dNote)
+    });
+    return newNote;
+  }
+
+  /**
    * If a note is set as having the mouse held down over it, remove it from
    * that designation and redraw it as normal.
    */
   function clearMouseDown() {
+    globals.mouseDownNoteEvent = undefined;
     if (globals.mouseDownNote) {
       var note = globals.mouseDownNote;
       globals.mouseDownNote = undefined;
@@ -287,20 +315,18 @@ var notedisplay = {};
     var hoveredNoteEdge = getNoteEdgeFromMouseEvent(mouseEvent);
     var hoveredNote = getNoteFromMouseEvent(mouseEvent);
     clearHighlight();
-    if (hoveredNoteEdge) {
+    clearDrag();
+    if (globals.mouseDownNote) {
+      var dragNote = getNoteShiftedToMouse(globals.mouseDownNote,
+        globals.mouseDownNoteEvent, mouseEvent);
+      var ctx = globals.dragCanvas.getContext("2d");
+      drawNoteWithColor(dragNote, globals.NOTE_DRAG_COLOR, ctx);
+    } else if (hoveredNoteEdge) {
       globals.highlightedNoteEdge = hoveredNoteEdge;
       drawNote(hoveredNoteEdge.note, globals.noteCanvas.getContext("2d"));
     } else if (hoveredNote) {
       globals.highlightedNote = hoveredNote;
       drawNote(hoveredNote, globals.noteCanvas.getContext("2d"));
-    }
-    // This condition doesn't do exactly what we want (it doesn't clear the
-    // mouse-down edge after moving off that edge), but that functionality will
-    // change once edges can be dragged and the logic was too complex to add in
-    // temporarily
-    if ((hoveredNote !== globals.mouseDownNote) &&
-        (!globals.mouseDownNoteEdge)) {
-      clearMouseDown();
     }
   }
 
@@ -310,6 +336,7 @@ var notedisplay = {};
   function onMouseLeaveNoteCanvas(mouseEvent) {
     clearHighlight();
     clearMouseDown();
+    clearDrag();
   }
 
   /**
@@ -339,6 +366,9 @@ var notedisplay = {};
     var mouseDownNote = getNoteFromMouseEvent(mouseEvent);
     clearSelection();
     clearMouseDown();
+    if (mouseDownNoteEdge || mouseDownNote) {
+      globals.mouseDownNoteEvent = mouseEvent;
+    }
     if (mouseDownNoteEdge) {
       globals.mouseDownNoteEdge = mouseDownNoteEdge;
       drawNote(mouseDownNoteEdge.note, globals.noteCanvas.getContext("2d"));
@@ -362,10 +392,21 @@ var notedisplay = {};
    */
   function onMouseUpNoteCanvas(mouseEvent) {
     var mouseUpNote = getNoteFromMouseEvent(mouseEvent);
-    if ((globals.mouseDownNote && (globals.mouseDownNote === mouseUpNote)) ||
+    clearSelection();
+    clearDrag();
+    if (globals.mouseDownNote &&
+        ((mouseEvent.x != globals.mouseDownNoteEvent.x) ||
+        (mouseEvent.y != globals.mouseDownNoteEvent.y))) {
+      if (globals.updateCallback) {
+        var noteI = globals.notes.indexOf(globals.mouseDownNote);
+        globals.updateCallback(noteI, getNoteShiftedToMouse(
+          globals.mouseDownNote, globals.mouseDownNoteEvent, mouseEvent
+        ));
+      }
+    } else if ((globals.mouseDownNote &&
+          (globals.mouseDownNote === mouseUpNote)) ||
         (globals.mouseDownNoteEdge &&
           (globals.mouseDownNoteEdge.note == mouseUpNote))) {
-      clearSelection();
       globals.selectedNote = mouseUpNote;
       drawNote(globals.selectedNote, globals.noteCanvas.getContext("2d"));
     }
@@ -400,27 +441,32 @@ var notedisplay = {};
   /**
    * Initialize the canvases used for the display as children of the provided
    * element. The deleteCallback will be called with the argument of a note if
-   * the user ever tries to 'delete' said note.
+   * the user ever tries to 'delete' said note. The updateCallback will be
+   * called with the arguments index newNote if the user tries to 'update' the
+   * note at index to newNote.
    *
    * This function must be called first before you can use other display
    * functions.
    */
-  notedisplay.init = function(container, deleteCallback) {
+  notedisplay.init = function(container, deleteCallback, updateCallback) {
     globals.noteCanvas = document.createElement("canvas");
     globals.noteCanvas.width = 0;
     globals.noteCanvas.height = 0;
-    globals.noteCanvas.addEventListener("mousemove", onMouseMoveNoteCanvas);
-    globals.noteCanvas.addEventListener("mouseleave", onMouseLeaveNoteCanvas);
-    globals.noteCanvas.addEventListener("mousedown", onMouseDownNoteCanvas);
-    document.addEventListener("mousedown", onMouseDownDocument);
-    globals.noteCanvas.addEventListener("mouseup", onMouseUpNoteCanvas);
-    document.addEventListener("keydown", onKeyDownDocument);
     container.appendChild(globals.noteCanvas);
     globals.dragCanvas = document.createElement("canvas");
     globals.dragCanvas.width = 0;
     globals.dragCanvas.height = 0;
+    globals.dragCanvas.style.position = "relative";
+    globals.dragCanvas.style.zIndex = 1;
+    globals.dragCanvas.addEventListener("mousemove", onMouseMoveNoteCanvas);
+    globals.dragCanvas.addEventListener("mouseleave", onMouseLeaveNoteCanvas);
+    globals.dragCanvas.addEventListener("mousedown", onMouseDownNoteCanvas);
+    document.addEventListener("mousedown", onMouseDownDocument);
+    globals.dragCanvas.addEventListener("mouseup", onMouseUpNoteCanvas);
+    document.addEventListener("keydown", onKeyDownDocument);
     container.appendChild(globals.dragCanvas);
     globals.deleteCallback = deleteCallback;
+    globals.updateCallback = updateCallback;
   };
 
   /**
@@ -452,6 +498,7 @@ var notedisplay = {};
     globals.noteCanvas.height = (globals.NOTE_HEIGHT + globals.NOTE_GAP) * 128;
     globals.dragCanvas.width = globals.noteCanvas.width;
     globals.dragCanvas.height = globals.noteCanvas.height;
+    globals.dragCanvas.style.left = -globals.noteCanvas.width;
     var ctx = globals.noteCanvas.getContext("2d");
     globals.notes.forEach(function(note) { drawNote(note, ctx); });
   }

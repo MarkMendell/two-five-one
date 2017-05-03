@@ -174,12 +174,28 @@ var index = {};
   }
 
   /**
+   * Called by notedisplay when a user has 'updated' the note at the given index
+   * to the provided value.
+   */
+  function onUpdateNote(index, note) {
+    globals.notes.splice(index, 1);
+    var len = globals.notes.length;
+    for (var i=0; i<=len; i++) {
+      if ((i == len) || (note.start <= globals.notes[i].start)) {
+        globals.notes.splice(i, 0, note);
+        break;
+      }
+    }
+    notedisplay.showNotes(globals.notes);
+  }
+
+  /**
    * Initialize the page - called once and first on load.
    */
   index.init = function() {
     initEventListeners();
     var displayContainer = document.getElementById("record-display");
-    notedisplay.init(displayContainer, onDeleteNote);
+    notedisplay.init(displayContainer, onDeleteNote, onUpdateNote);
     navigator.requestMIDIAccess().then(function(midiAccess) {
       globals.midiAccess = midiAccess;
       onPressRefreshInputs();
