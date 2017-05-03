@@ -313,6 +313,17 @@ var notedisplay = {};
   }
 
   /**
+   * If there's a selected note, remove it and redraw it.
+   */
+  function clearSelection() {
+    if (globals.selectedNote) {
+      var note = globals.selectedNote;
+      globals.selectedNote = undefined;
+      drawNote(note, globals.noteCanvas.getContext("2d"));
+    }
+  }
+
+  /**
    * Called when the mouse is pressed down (but not a full click) in the
    * noteCanvas.
    */
@@ -326,6 +337,7 @@ var notedisplay = {};
     mouseEvent.stopPropagation();
     var mouseDownNoteEdge = getNoteEdgeFromMouseEvent(mouseEvent);
     var mouseDownNote = getNoteFromMouseEvent(mouseEvent);
+    clearSelection();
     clearMouseDown();
     if (mouseDownNoteEdge) {
       globals.mouseDownNoteEdge = mouseDownNoteEdge;
@@ -343,17 +355,6 @@ var notedisplay = {};
    */
   function onMouseDownDocument(mouseEvent) {
     globals.isFocused = false;
-  }
-
-  /**
-   * If there's a selected note, remove it and redraw it.
-   */
-  function clearSelection() {
-    if (globals.selectedNote) {
-      var note = globals.selectedNote;
-      globals.selectedNote = undefined;
-      drawNote(note, globals.noteCanvas.getContext("2d"));
-    }
   }
 
   /**
