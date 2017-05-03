@@ -292,6 +292,27 @@ var notedisplay = {};
   }
 
   /**
+   * Return a copy of the note with its values shifted like the edge has been
+   * dragged from the start to the end mouse event coordinates.
+   */
+  function getNoteStretchedToMouse(note, edge, startMouseEvent, endMouseEvent) {
+    var newNote = getNoteShiftedToMouse(note, startMouseEvent, endMouseEvent);
+    newNote.note = note.note;
+    if (edge === "left") {
+      newNote.end = note.end;
+      if (newNote.start >= (newNote.end - globals.PX_PER_MS)) {
+        newNote.start = newNote.end - globals.PX_PER_MS;
+      }
+    } else {
+      newNote.start = note.start;
+      if (newNote.end <= (newNote.start + globals.PX_PER_MS)) {
+        newNote.end = newNote.start + globals.PX_PER_MS;
+      }
+    }
+    return newNote;
+  }
+
+  /**
    * If a note is set as having the mouse held down over it, remove it from
    * that designation and redraw it as normal.
    */
@@ -323,6 +344,11 @@ var notedisplay = {};
         globals.mouseDownNoteEvent, mouseEvent);
       var ctx = globals.dragCanvas.getContext("2d");
       drawNoteWithColor(dragNote, globals.NOTE_DRAG_COLOR, ctx);
+    } else if (globals.mouseDownNoteEdge) {
+      var stretchNote = getNoteStretchedToMouse(globals.mouseDownNoteEdge.note,
+        globals.mouseDownNoteEdge.edge, globals.mouseDownNoteEvent, mouseEvent);
+      var ctx = globals.dragCanvas.getContext("2d");
+      drawNoteWithColor(stretchNote, globals.NOTE_DRAG_COLOR, ctx);
     } else if (hoveredNoteEdge) {
       globals.highlightedNoteEdge = hoveredNoteEdge;
       drawNote(hoveredNoteEdge.note, globals.noteCanvas.getContext("2d"));
@@ -396,13 +422,18 @@ var notedisplay = {};
     var mouseUpNote = getNoteFromMouseEvent(mouseEvent);
     clearSelection();
     clearDrag();
-    if (globals.mouseDownNote &&
+    if ((globals.mouseDownNote || globals.mouseDownNoteEdge) &&
         ((mouseEvent.x != globals.mouseDownNoteEvent.x) ||
         (mouseEvent.y != globals.mouseDownNoteEvent.y))) {
       if (globals.updateCallback) {
-        var noteI = globals.notes.indexOf(globals.mouseDownNote);
-        globals.updateCallback(noteI, getNoteShiftedToMouse(
-          globals.mouseDownNote, globals.mouseDownNoteEvent, mouseEvent
+        var noteI = globals.notes.indexOf(globals.mouseDownNote ?
+          globals.mouseDownNote : globals.mouseDownNoteEdge.note);
+        globals.updateCallback(noteI, globals.mouseDownNote ?
+          getNoteShiftedToMouse(
+            globals.mouseDownNote, globals.mouseDownNoteEvent, mouseEvent
+          ) : getNoteStretchedToMouse(
+            globals.mouseDownNoteEdge.note, globals.mouseDownNoteEdge.edge,
+            globals.mouseDownNoteEvent, mouseEvent
         ));
       }
     } else if ((globals.mouseDownNote &&
