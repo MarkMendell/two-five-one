@@ -146,8 +146,9 @@ var playback = {};
       globals.bufferSource = args.audioContext.createBufferSource();
       globals.bufferSource.buffer = args.audioBuffer;
       globals.bufferSource.connect(args.audioContext.destination);
+      var audioNow = args.audioContext.currentTime*1000;  // Different from now!
       globals.bufferSource.start(
-        (now + globals.SYNC_PAD) / 1000.0, args.startTime / 1000.0
+        (audioNow + globals.SYNC_PAD) / 1000.0, args.startTime / 1000.0
       );
     }
     globals.playbackIntervalId = setInterval(
