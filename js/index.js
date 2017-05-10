@@ -75,7 +75,7 @@ var index = {};
     if (fileElem.files.length < 1) {
       statusElem.textContent = "Please choose a file to upload.";
     } else {
-      reader = new FileReader();
+      var reader = new FileReader();
       reader.onload = function() {
         globals.audioContext.decodeAudioData(reader.result).then(
           function(buffer) {
@@ -134,6 +134,15 @@ var index = {};
   }
 
   /**
+   * Returns true if the two notes are the same note value played before the
+   * first one finishes.
+   */
+  function areOverlapping(note1, note2) {
+    return (note1.note === note2.note) &&
+      ((note2.end >= note1.start) && (note1.end >= note2.start));
+  }
+
+  /**
    * Given two lists of notes, return one list of notes where overlapping notes
    * (same note value and start while another is still sounding) become a single
    * note whose duration is the union of both notes' durations. This function
@@ -149,15 +158,11 @@ var index = {};
    */
   function mergeNotes(oldNotes, newNotes) {
     var mergedNotes = util.noteListCopy(oldNotes);
-    var areOverlapping = function(note1, note2) {
-      return (note1.note === note2.note) &&
-        (!((note2.end < note1.start) || (note2.start > note1.end)));
-    };
     for (var newNote_i=0; newNote_i<newNotes.length; newNote_i++) {
       var mergingNote = newNotes[newNote_i];
       var merged_i = 0;
       while (merged_i < mergedNotes.length) {
-        mergedNote = mergedNotes[merged_i];
+        var mergedNote = mergedNotes[merged_i];
         if (areOverlapping(mergingNote, mergedNote)) {
           mergingNote = {
             note: mergingNote.note,
@@ -318,6 +323,84 @@ var index = {};
   }
 
   /**
+   * Parse the json list of notes, making sure that each note has a start, end,
+   * note, and velocity that make sense (nonnegative, end > start), and that the
+   * order also makes sense (ascending starts and no overlap).
+   */
+  function onPressLoadNotes() {
+    var statusElem = document.getElementById("load-notes-status");
+    statusElem.textContent = "Loading...";
+    var fileElem = document.getElementById("notes-file");
+    if (fileElem.files.length < 1) {
+      statusElem.textContent = "Please choose a file to upload.";
+    } else {
+      var reader = new FileReader();
+      reader.onload = function() {
+        var notes = null;
+        try {
+          notes = JSON.parse(reader.result);
+        } catch (e) {
+          statusElem.textContent = "Failed to parse notes (json): " + e.message;
+        }
+        if (notes) {
+          noteloop:
+          for (var i=0; i<notes.length; i++) {
+            var props = ["start", "end", "note", "velocity"];
+            for (var propI=0; propI<props.length; propI++) {
+              var prop = props[propI];
+              if (!notes[i].hasOwnProperty(prop)) {
+                statusElem.textContent = "Failed to parse notes: Note " + i +
+                  " missing property " + prop + ".";
+                break noteloop;
+              }
+              var type = typeof notes[i][prop];
+              if (type !== 'number') {
+                statusElem.textContent = "Failed to parse notes: Note " + i +
+                  " property " + prop + " is not a number, but a " + type;
+                break noteloop;
+              }
+              if (notes[i][prop] < 0) {
+                statusElem.textContent = "Failed to parse notes: Note " + i +
+                  " property " + prop + " is negative";
+                break noteloop;
+              }
+            }
+            notes[i] = {
+              start: notes[i].start,
+              end: notes[i].end,
+              note: notes[i].note,
+              velocity: notes[i].velocity
+            };
+            if (notes[i].end <= notes[i].start) {
+              statusElem.textContent = "Failed to parse notes: Note " + i +
+                " end was not after start";
+              break;
+            }
+            if (i && (notes[i].start < notes[i-1].start)) {
+              statusElem.textContent = "Failed to parse notes: Note " + i +
+                " out of order";
+              break;
+            }
+            for (var j=i+1; j<notes.length; j++) {
+              if (areOverlapping(notes[i], notes[j])) {
+                statusElem.textContent = "Failed to parse notes: Notes " + i +
+                  " and " + j + " are overlapping";
+                break noteloop;
+              }
+            }
+          }
+          if (statusElem.textContent === "Loading...") {
+            globals.notes = notes;
+            notedisplay.showNotes(notes, globals.audioBuffer);
+            statusElem.textContent = "Loaded.";
+          }
+        }
+      };
+      reader.readAsText(fileElem.files[0]);
+    }
+  }
+
+  /**
    * Shows or hides the key bindings section.
    */
   function onClickKeysToggle() {
@@ -360,6 +443,8 @@ var index = {};
     panicButton.addEventListener("click", onPressPanic);
     var saveButton = document.getElementById("save");
     saveButton.addEventListener("click", onPressSave);
+    var loadNotesButton = document.getElementById("load-notes");
+    loadNotesButton.addEventListener("click", onPressLoadNotes);
     var keysToggleElem = document.getElementById("keys-toggle");
     keysToggleElem.addEventListener("click", onClickKeysToggle);
   }
