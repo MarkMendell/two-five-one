@@ -306,6 +306,18 @@ var index = {};
   }
 
   /**
+   * Download the notes as a json file.
+   */
+  function onPressSave() {
+    var a = document.createElement('a');
+    var notesJson = JSON.stringify(globals.notes);
+    var notesBlob = new Blob([notesJson], {type: 'application/json'});
+    a.href = window.URL.createObjectURL(notesBlob);
+    a.download = 'notes.json';
+    a.click();
+  }
+
+  /**
    * Shows or hides the key bindings section.
    */
   function onClickKeysToggle() {
@@ -346,6 +358,8 @@ var index = {};
     stopPlayButton.addEventListener("click", onPressStopPlay);
     var panicButton = document.getElementById("panic");
     panicButton.addEventListener("click", onPressPanic);
+    var saveButton = document.getElementById("save");
+    saveButton.addEventListener("click", onPressSave);
     var keysToggleElem = document.getElementById("keys-toggle");
     keysToggleElem.addEventListener("click", onClickKeysToggle);
   }
